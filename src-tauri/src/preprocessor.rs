@@ -2,6 +2,7 @@ use anyhow::Result;
 use pulldown_cmark::{CodeBlockKind, CowStr, Event, Options, Parser, Tag};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct EditorPosition {
@@ -42,17 +43,60 @@ pub struct AnchorMeta {
 pub struct PreprocessorOutput {
     pub markdown: String,
     pub anchors: Vec<AnchorMeta>,
+    pub tikz_blocks: Vec<TikzBlockMeta>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TikzRequestedFormat {
+    Vector,
+    RasterPng,
+}
+
+#[derive(Debug, Clone)]
+pub struct TikzBlockMeta {
+    pub id: String,
+    pub diagram: String,
+    pub preamble: Option<String>,
+    pub requested_format: TikzRequestedFormat,
+    pub asset_path: String,
+    pub asset_extension: &'static str,
+}
+
+impl TikzRequestedFormat {
+    fn from_option(value: Option<&str>) -> Self {
+        match value {
+            Some(v) if v.eq_ignore_ascii_case("png") => TikzRequestedFormat::RasterPng,
+            _ => TikzRequestedFormat::Vector,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            TikzRequestedFormat::Vector => "vector",
+            TikzRequestedFormat::RasterPng => "png",
+        }
+    }
 }
 
 /// Transform user markdown by injecting invisible Typst anchors used for scroll synchronisation.
 pub fn preprocess_markdown(markdown: &str) -> Result<PreprocessorOutput> {
-    let transformed = inject_tikz_blocks(markdown);
-    let result = inject_anchors(&transformed)?;
-    Ok(result)
+    let tikz = inject_tikz_blocks(markdown);
+    let anchor_result = inject_anchors(&tikz.markdown)?;
+    Ok(PreprocessorOutput {
+        markdown: anchor_result.markdown,
+        anchors: anchor_result.anchors,
+        tikz_blocks: tikz.blocks,
+    })
 }
 
-fn inject_tikz_blocks(markdown: &str) -> String {
-    let mut replacements: Vec<(usize, usize, String)> = Vec::new();
+#[derive(Debug, Clone)]
+struct TikzTransformResult {
+    markdown: String,
+    blocks: Vec<TikzBlockMeta>,
+}
+
+fn inject_tikz_blocks(markdown: &str) -> TikzTransformResult {
+    let mut replacements: Vec<(usize, usize, String, TikzBlockMeta)> = Vec::new();
     let mut current: Option<TikzBlockInProgress> = None;
 
     let parser = Parser::new_ext(
@@ -73,13 +117,14 @@ fn inject_tikz_blocks(markdown: &str) -> String {
                         start: range.start,
                         options,
                         content: String::new(),
+                        id: format!("tikz-{}", Uuid::new_v4().simple()),
                     });
                 }
             }
             Event::End(Tag::CodeBlock(CodeBlockKind::Fenced(_))) => {
                 if let Some(active) = current.take() {
-                    let placeholder = build_tikz_placeholder(&active.content, &active.options);
-                    replacements.push((active.start, range.end, placeholder));
+                    let (placeholder, meta) = build_tikz_placeholder(&active);
+                    replacements.push((active.start, range.end, placeholder, meta));
                 }
             }
             Event::Text(text) | Event::Code(text) => {
@@ -97,17 +142,26 @@ fn inject_tikz_blocks(markdown: &str) -> String {
     }
 
     if replacements.is_empty() {
-        return markdown.to_owned();
+        return TikzTransformResult {
+            markdown: markdown.to_owned(),
+            blocks: Vec::new(),
+        };
     }
 
     let mut output = markdown.to_owned();
-    for (start, end, replacement) in replacements.into_iter().rev() {
+    let mut blocks = Vec::new();
+    for (start, end, replacement, meta) in replacements.into_iter().rev() {
         if start <= end && end <= output.len() {
             output.replace_range(start..end, &replacement);
+            blocks.push(meta);
         }
     }
+    blocks.reverse();
 
-    output
+    TikzTransformResult {
+        markdown: output,
+        blocks,
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -122,6 +176,7 @@ struct TikzBlockInProgress {
     start: usize,
     options: TikzFenceOptions,
     content: String,
+    id: String,
 }
 
 fn parse_tikz_fence(info: &CowStr<'_>) -> Option<TikzFenceOptions> {
@@ -182,31 +237,37 @@ fn parse_tikz_fence(info: &CowStr<'_>) -> Option<TikzFenceOptions> {
     Some(options)
 }
 
-fn build_tikz_placeholder(content: &str, options: &TikzFenceOptions) -> String {
-    let mut args = Vec::new();
-    args.push(format!("diagram: \"{}\"", escape_typst_string(content)));
+fn build_tikz_placeholder(block: &TikzBlockInProgress) -> (String, TikzBlockMeta) {
+    let requested_format = TikzRequestedFormat::from_option(block.options.format.as_deref());
+    let asset_extension = "pdf";
+    let asset_path = format!("tikz/{}.{}", block.id, asset_extension);
 
-    if let Some(scale) = options.scale.as_ref() {
+    let mut args = Vec::new();
+    args.push(format!("asset: \"{}\"", asset_path));
+    args.push(format!("format: \"{}\"", requested_format.as_str()));
+    if let Some(scale) = block.options.scale.as_ref() {
         if !scale.trim().is_empty() {
             args.push(format!("scale: {}", format_scale_value(scale)));
         }
-    }
-
-    if let Some(preamble) = options.preamble.as_ref() {
-        args.push(format!("preamble: \"{}\"", escape_typst_string(preamble)));
-    }
-
-    if let Some(format) = options.format.as_ref() {
-        if !format.is_empty() {
-            args.push(format!("format: \"{}\"", escape_typst_string(format)));
-        }
+    } else {
+        args.push("scale: auto".to_string());
     }
 
     let mut placeholder = String::new();
     placeholder.push_str("<!--raw-typst #tikz_render(");
     placeholder.push_str(&args.join(", "));
     placeholder.push_str(") -->\n");
-    placeholder
+
+    let meta = TikzBlockMeta {
+        id: block.id.clone(),
+        diagram: block.content.clone(),
+        preamble: block.options.preamble.clone(),
+        requested_format,
+        asset_path,
+        asset_extension,
+    };
+
+    (placeholder, meta)
 }
 
 fn escape_typst_string(input: &str) -> String {
@@ -377,19 +438,29 @@ mod tests {
 "#;
 
         let transformed = inject_tikz_blocks(markdown);
-        let expected_preamble = format!(
-            "preamble: \"{}\"",
-            escape_typst_string("\\usetikzlibrary{arrows.meta}")
+        assert!(transformed.markdown.contains("#tikz_render"));
+        assert!(transformed.markdown.contains("scale: auto"));
+        assert!(transformed.markdown.contains("format: \"png\""));
+        assert!(!transformed.markdown.contains("```tikz"));
+        assert_eq!(transformed.blocks.len(), 1);
+        let meta = &transformed.blocks[0];
+        assert_eq!(
+            meta.preamble.as_deref(),
+            Some(r"\usetikzlibrary{arrows.meta}")
         );
-        assert!(transformed.contains("#tikz_render"));
-        assert!(transformed.contains("scale: auto"));
-        assert!(transformed.contains(&expected_preamble));
-        assert!(transformed.contains("format: \"png\""));
-        assert!(!transformed.contains("```tikz"));
+        assert!(meta.asset_path.starts_with("tikz/"));
+        assert_eq!(meta.asset_extension, "pdf");
+        assert_eq!(meta.requested_format.as_str(), "png");
     }
 }
 
-fn inject_anchors(markdown: &str) -> Result<PreprocessorOutput> {
+#[derive(Debug, Clone)]
+struct AnchorTransformResult {
+    markdown: String,
+    anchors: Vec<AnchorMeta>,
+}
+
+fn inject_anchors(markdown: &str) -> Result<AnchorTransformResult> {
     let mut insertions: Vec<(usize, String)> = Vec::new();
     let mut anchors: Vec<AnchorMeta> = Vec::new();
     let mut seen_offsets: HashSet<usize> = HashSet::new();
@@ -480,7 +551,7 @@ fn inject_anchors(markdown: &str) -> Result<PreprocessorOutput> {
         output.insert_str(offset, &snippet);
     }
 
-    Ok(PreprocessorOutput {
+    Ok(AnchorTransformResult {
         markdown: output,
         anchors,
     })

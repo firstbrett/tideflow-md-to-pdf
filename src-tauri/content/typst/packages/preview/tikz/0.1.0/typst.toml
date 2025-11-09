@@ -1,9 +1,0 @@
-[package]
-name = "tikz"
-version = "0.1.0"
-entrypoint = "lib.typ"
-authors = ["Tideflow Maintainers"]
-license = "MIT"
-description = "Placeholder TikZ renderer used while offline bundling is prepared."
-keywords = ["tikz", "graphics", "placeholder"]
-compiler = "0.13.1"

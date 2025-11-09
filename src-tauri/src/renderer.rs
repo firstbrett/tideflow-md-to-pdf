@@ -3,6 +3,7 @@ use crate::preprocessor::{
     SourceMapPayload,
 };
 use crate::render_pipeline::{self, RenderConfig};
+use crate::tikz;
 use crate::utils;
 use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
@@ -82,7 +83,13 @@ fn build_source_map(
 
     // Try multiple selector variants to support different Typst versions.
     // Some Typst releases expect element-style selectors (e.g. element(label)).
-    let selector_variants = vec!["label", "element(label)", "element('label')", "element(\"label\")", "element.label"];
+    let selector_variants = vec![
+        "label",
+        "element(label)",
+        "element('label')",
+        "element(\"label\")",
+        "element.label",
+    ];
     let mut tried_any = false;
     for selector in selector_variants.iter() {
         let args = [
@@ -99,10 +106,7 @@ fn build_source_map(
         if let Some(env) = package_env.as_ref() {
             query_cmd.env("TYPST_PACKAGE_PATH", env);
         }
-        let query_result = query_cmd
-            .current_dir(build_dir)
-            .args(&args)
-            .output();
+        let query_result = query_cmd.current_dir(build_dir).args(&args).output();
 
         tried_any = true;
         if let Ok(output) = query_result {
@@ -118,14 +122,20 @@ fn build_source_map(
             if let Err(e) = std::fs::write(&out_dump, stdout_txt.as_bytes()) {
                 println!("[renderer] failed to write typst query stdout dump: {}", e);
             } else {
-                println!("[renderer] typst query stdout written to: {}", out_dump.display());
+                println!(
+                    "[renderer] typst query stdout written to: {}",
+                    out_dump.display()
+                );
             }
             // Emit stdout to the frontend for easier debugging in DevTools
             let _ = app_handle.emit("typst-query-stdout", stdout_txt.clone());
             if let Err(e) = std::fs::write(&err_dump, stderr_txt.as_bytes()) {
                 println!("[renderer] failed to write typst query stderr dump: {}", e);
             } else {
-                println!("[renderer] typst query stderr written to: {}", err_dump.display());
+                println!(
+                    "[renderer] typst query stderr written to: {}",
+                    err_dump.display()
+                );
             }
             // Emit stderr to the frontend so the UI can show precise Typst errors
             let _ = app_handle.emit("typst-query-stderr", stderr_txt.clone());
@@ -135,7 +145,9 @@ fn build_source_map(
             // immediately notify the frontend so it can fall back to the
             // PDF-text extraction path. This avoids repeatedly invoking an
             // incompatible `typst query` and flooding the logs.
-            if stderr_txt.contains("unknown variable: element") || stderr_txt.contains("only element functions can be used as selectors") {
+            if stderr_txt.contains("unknown variable: element")
+                || stderr_txt.contains("only element functions can be used as selectors")
+            {
                 println!("[renderer] typst query stderr indicates incompatible selector syntax; emitting typst-query-failed and aborting selector loop");
                 let _ = app_handle.emit("typst-query-failed", stderr_txt.clone());
                 return attach_pdf_positions(anchors, &pdf_lookup);
@@ -155,16 +167,31 @@ fn build_source_map(
                     println!("[renderer] typst query produced output but parser failed for selector '{}'", selector);
                 }
             } else {
-                println!("[renderer] typst query failed for selector '{}'; see stderr dump for details", selector);
+                println!(
+                    "[renderer] typst query failed for selector '{}'; see stderr dump for details",
+                    selector
+                );
                 // try next selector
             }
         } else if let Err(e) = query_result {
-            println!("[renderer] typst query invocation error for selector '{}': {:?}", selector, e);
-            let inv_err = build_dir.join(format!(".typst_query_invocation_error_{}.txt", selector.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect::<String>()));
+            println!(
+                "[renderer] typst query invocation error for selector '{}': {:?}",
+                selector, e
+            );
+            let inv_err = build_dir.join(format!(
+                ".typst_query_invocation_error_{}.txt",
+                selector
+                    .chars()
+                    .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+                    .collect::<String>()
+            ));
             if let Err(err) = std::fs::write(&inv_err, format!("{:?}", e).as_bytes()) {
                 println!("[renderer] failed to write typst invocation error: {}", err);
             } else {
-                println!("[renderer] typst invocation error written to: {}", inv_err.display());
+                println!(
+                    "[renderer] typst invocation error written to: {}",
+                    inv_err.display()
+                );
             }
         }
     }
@@ -187,7 +214,11 @@ pub async fn render_markdown(app_handle: &AppHandle, file_path: &str) -> Result<
     let path = Path::new(file_path);
 
     // Only render markdown files
-    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
     if ext != "md" && ext != "qmd" {
         return Err(anyhow!("Not a markdown file: {}", file_path));
     }
@@ -236,21 +267,13 @@ pub async fn render_markdown(app_handle: &AppHandle, file_path: &str) -> Result<
     let assets_root_ref = assets_root.as_deref();
 
     // Clean (export) version: do NOT inject visible tokens
-    let preprocess_clean = preprocess_markdown(&md_content_raw)?;
-    let md_content_clean = utils::rewrite_image_paths_in_markdown(
-        &preprocess_clean.markdown,
-        base_dir,
-        assets_root_ref,
-    );
+    let preprocess = preprocess_markdown(&md_content_raw)?;
+    let md_content_clean =
+        utils::rewrite_image_paths_in_markdown(&preprocess.markdown, base_dir, assets_root_ref);
     fs::write(build_dir.join("content.md"), &md_content_clean)?;
 
-    // Preview version: inject preview-only tokens (these will NOT be used for exports)
-    let preprocess_preview = preprocess_markdown(&md_content_raw)?;
-    let md_content_preview = utils::rewrite_image_paths_in_markdown(
-        &preprocess_preview.markdown,
-        base_dir,
-        assets_root_ref,
-    );
+    // Preview version currently mirrors clean content (hooks exist for future preview tokens)
+    let md_content_preview = md_content_clean.clone();
     fs::write(build_dir.join("content.preview.md"), &md_content_preview)?;
     // Also write debug copies into workspace for developer inspection
     if let Ok(cwd) = std::env::current_dir() {
@@ -259,6 +282,8 @@ pub async fn render_markdown(app_handle: &AppHandle, file_path: &str) -> Result<
         let _ = std::fs::write(dbg_dir.join("content.md"), &md_content_clean);
         let _ = std::fs::write(dbg_dir.join("content.preview.md"), &md_content_preview);
     }
+
+    tikz::prepare_tikz_assets(app_handle, &preprocess.tikz_blocks, &build_dir)?;
 
     // Setup template (copies template and syncs theme assets)
     render_pipeline::setup_template(&config, "markdown")?;
@@ -275,7 +300,10 @@ pub async fn render_markdown(app_handle: &AppHandle, file_path: &str) -> Result<
     let content_md = build_dir.join("content.md");
     if preview_src.exists() {
         if let Err(e) = fs::copy(&preview_src, &content_md) {
-            println!("[renderer] warning: failed to install preview content for compile: {}", e);
+            println!(
+                "[renderer] warning: failed to install preview content for compile: {}",
+                e
+            );
         }
     }
 
@@ -294,7 +322,13 @@ pub async fn render_markdown(app_handle: &AppHandle, file_path: &str) -> Result<
     last_render_times.insert(file_path.to_string(), mod_time);
 
     // Use the anchor list from the clean preprocess (anchors are identical between preview and clean)
-    let source_map = build_source_map(app_handle, &typst_path, &build_dir, &content_dir, &preprocess_clean.anchors);
+    let source_map = build_source_map(
+        app_handle,
+        &typst_path,
+        &build_dir,
+        &content_dir,
+        &preprocess.anchors,
+    );
     let document = RenderedDocument {
         pdf_path: preview_pdf.to_string_lossy().to_string(),
         source_map,
@@ -308,7 +342,11 @@ pub async fn export_markdown(app_handle: &AppHandle, file_path: &str) -> Result<
     let path = Path::new(file_path);
 
     // Only export markdown files
-    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
     if ext != "md" && ext != "qmd" {
         return Err(anyhow!("Not a markdown file: {}", file_path));
     }
@@ -346,6 +384,7 @@ pub async fn export_markdown(app_handle: &AppHandle, file_path: &str) -> Result<
     let md_content =
         utils::rewrite_image_paths_in_markdown(&preprocess.markdown, base_dir, assets_root_ref);
     fs::write(build_dir.join("content.md"), md_content)?;
+    tikz::prepare_tikz_assets(app_handle, &preprocess.tikz_blocks, &build_dir)?;
 
     // Setup template
     render_pipeline::setup_template(&config, "markdown-export")?;
@@ -356,10 +395,11 @@ pub async fn export_markdown(app_handle: &AppHandle, file_path: &str) -> Result<
 
     // Compile to final PDF next to source file
     let final_pdf = Path::new(file_path).with_extension("pdf");
-    let final_pdf_name = final_pdf.file_name()
+    let final_pdf_name = final_pdf
+        .file_name()
         .and_then(|n| n.to_str())
         .ok_or_else(|| anyhow!("Invalid output filename"))?;
-    
+
     render_pipeline::compile_typst(&config, &typst_path, final_pdf_name)?;
 
     if !final_pdf.exists() {
@@ -367,7 +407,9 @@ pub async fn export_markdown(app_handle: &AppHandle, file_path: &str) -> Result<
     }
 
     // Emit absolute path of final PDF to UI
-    app_handle.emit("exported", final_pdf.to_string_lossy().to_string()).ok();
+    app_handle
+        .emit("exported", final_pdf.to_string_lossy().to_string())
+        .ok();
 
     Ok(final_pdf.to_string_lossy().to_string())
 }
@@ -399,7 +441,7 @@ pub async fn render_typst(
     // Preprocess content to rewrite image paths so Typst/cmarker can resolve them properly
     // For ad-hoc typst renders, include visible tokens to aid preview extraction
     let preprocess = preprocess_markdown(content)?;
-    
+
     // Determine base directory for image path resolution
     // Use the current file's parent directory if available, otherwise fall back to content_dir
     let base_dir = if let Some(file_path) = current_file {
@@ -410,16 +452,13 @@ pub async fn render_typst(
     } else {
         content_dir.clone()
     };
-    
+
     // Rewrite image paths so Typst can resolve them
     let assets_root = utils::get_assets_dir(app_handle).ok();
     let assets_root_ref = assets_root.as_deref();
-    let mut processed = utils::rewrite_image_paths_in_markdown(
-        &preprocess.markdown,
-        &base_dir,
-        assets_root_ref,
-    );
-    
+    let mut processed =
+        utils::rewrite_image_paths_in_markdown(&preprocess.markdown, &base_dir, assets_root_ref);
+
     // Filter out external image URLs that cmarker can't fetch
     let re_external_img = regex::Regex::new(r"!\[[^\]]*\]\(https?://[^)]+\)")
         .expect("BUG: Invalid regex pattern for external markdown images");
@@ -428,12 +467,12 @@ pub async fn render_typst(
     let re_external_html = regex::Regex::new(r#"<img[^>]*src=["']https?://[^"']+["'][^>]*>"#)
         .expect("BUG: Invalid regex pattern for external HTML images");
     processed = re_external_html.replace_all(&processed, "").to_string();
-    
+
     // Remove citation references [@ref] that would cause "label does not exist" errors
-    let re_citations = regex::Regex::new(r"\[@[^\]]+\]")
-        .expect("BUG: Invalid regex pattern for citations");
+    let re_citations =
+        regex::Regex::new(r"\[@[^\]]+\]").expect("BUG: Invalid regex pattern for citations");
     processed = re_citations.replace_all(&processed, "").to_string();
-    
+
     fs::write(&temp_content_path, &processed)?;
 
     // Setup render configuration - always use content_dir as Typst root
@@ -449,6 +488,7 @@ pub async fn render_typst(
 
     // Ensure the content is available as content.md (required by template)
     fs::copy(&temp_content_path, build_dir.join("content.md"))?;
+    tikz::prepare_tikz_assets(app_handle, &preprocess.tikz_blocks, &build_dir)?;
 
     // Setup template
     render_pipeline::setup_template(&config, "typst-temp")?;
@@ -459,21 +499,29 @@ pub async fn render_typst(
 
     // Compile with Typst - if it fails, just skip rendering silently
     let compile_result = render_pipeline::compile_typst(&config, &typst_path, &output_file_name);
-    
+
     // Clean up the temporary content file
     let _ = fs::remove_file(&temp_content_path);
 
     // If compilation failed or output not created, propagate error
     compile_result?;
-    
+
     if !output_path.exists() {
-        return Err(anyhow!("Output file was not created: {}", output_path.display()));
+        return Err(anyhow!(
+            "Output file was not created: {}",
+            output_path.display()
+        ));
     }
 
-    let source_map = build_source_map(app_handle, &typst_path, &build_dir, &content_dir, &preprocess.anchors);
+    let source_map = build_source_map(
+        app_handle,
+        &typst_path,
+        &build_dir,
+        &content_dir,
+        &preprocess.anchors,
+    );
     Ok(RenderedDocument {
         pdf_path: output_path.to_string_lossy().to_string(),
         source_map,
     })
 }
-

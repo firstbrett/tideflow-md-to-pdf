@@ -1,6 +1,5 @@
 // Main Tideflow Typst template (lean, preference-driven)
 #import "@preview/cmarker:0.1.6": render
-#import "@preview/tikz:0.1.0": tikz
 #import "themes/registry.typ": get-theme
 
 #let prefs = json("prefs.json")
@@ -21,16 +20,17 @@
 #let anchor = id => none
 
 #let tikz_render(
-  diagram: str,
-  scale: any = auto,
-  preamble: str = "",
+  asset: str,
+  scale := auto,
   format: str = "vector",
-) = tikz.render(
-  diagram: diagram,
-  scale: scale,
-  preamble: preamble,
-  format: format,
-)
+) = {
+  let graphic = image(asset)
+  if scale == auto || type(scale) == str {
+    graphic
+  } else {
+    scale(x: scale, y: scale)[graphic]
+  }
+}
 
 #let admonition-colors = (
   "note": (fill: color.mix(accent-color, rgb(255, 255, 255)), stroke: accent-color),

@@ -36,6 +36,11 @@ if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
     throw "cargo is still unavailable even after adjusting PATH."
 }
 
+$tectonicLocal = Join-Path $repoRoot 'src-tauri\bin\tectonic\windows\tectonic.exe'
+if (-not (Get-Command tectonic -ErrorAction SilentlyContinue) -and -not (Test-Path $tectonicLocal)) {
+    Write-Warning "Tectonic CLI not found on PATH or at $tectonicLocal. Install it (e.g. 'winget install Tectonic.Tectonic') or drop the binary into src-tauri\bin\tectonic\windows."
+}
+
 Write-Host "Running npm install (skip if already up-to-date)..." -ForegroundColor Yellow
 npm install
 

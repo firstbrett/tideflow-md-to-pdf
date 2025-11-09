@@ -17,8 +17,8 @@ pub mod typst;
 pub use filesystem::sanitize_filename;
 pub use initialization::{ensure_tideflow_template_exists, initialize_app_directories};
 pub use paths::{
-    get_app_dir, get_assets_dir, get_content_dir,
-    get_templates_dir, get_typst_path,
+    get_app_dir, get_assets_dir, get_content_dir, get_tectonic_path, get_templates_dir,
+    get_typst_path,
 };
 pub use typst::rewrite_image_paths_in_markdown;
 

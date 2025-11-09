@@ -2,9 +2,9 @@
 ///
 /// This module provides functions to export Typst documents to image formats.
 /// Separated from the main renderer to simplify merging with Free version.
-
 use crate::preprocessor::preprocess_markdown;
 use crate::render_pipeline::{self, RenderConfig};
+use crate::tikz;
 use crate::utils;
 use anyhow::{anyhow, Context, Result};
 use std::fs;
@@ -30,13 +30,16 @@ pub async fn export_as_image(
     app_handle: &AppHandle,
     content: &str,
     destination: &str,
-    format: &str, // "png" or "svg"
-    ppi: Option<u32>, // Only used for PNG, default is 144
+    format: &str,               // "png" or "svg"
+    ppi: Option<u32>,           // Only used for PNG, default is 144
     current_file: Option<&str>, // Optional file path for asset resolution
 ) -> Result<String> {
     // Validate format
     if format != "png" && format != "svg" {
-        return Err(anyhow!("Unsupported format: {}. Use 'png' or 'svg'", format));
+        return Err(anyhow!(
+            "Unsupported format: {}. Use 'png' or 'svg'",
+            format
+        ));
     }
 
     // Acquire lock to prevent multiple simultaneous exports
@@ -71,6 +74,7 @@ pub async fn export_as_image(
     let md_content =
         utils::rewrite_image_paths_in_markdown(&preprocess.markdown, base_dir, assets_root_ref);
     fs::write(build_dir.join("content.md"), md_content)?;
+    tikz::prepare_tikz_assets(app_handle, &preprocess.tikz_blocks, &build_dir)?;
 
     // Setup template
     render_pipeline::setup_template(&config, &format!("markdown-export-{}", format))?;
@@ -86,7 +90,8 @@ pub async fn export_as_image(
     // We'll add {p} to the filename (e.g., document-{p}.png becomes document-1.png, document-2.png, etc.)
     let output_name = {
         // Get the base name without extension
-        let file_stem = output_path.file_stem()
+        let file_stem = output_path
+            .file_stem()
             .and_then(|s| s.to_str())
             .ok_or_else(|| anyhow!("Invalid output filename"))?;
         let parent = output_path.parent().unwrap_or(Path::new(""));
@@ -119,10 +124,7 @@ pub async fn export_as_image(
         _ => unreachable!("Format already validated"),
     }
 
-    command.args([
-        "tideflow.typ",
-        &output_name,
-    ]);
+    command.args(["tideflow.typ", &output_name]);
 
     // Set package path if needed
     if let Some(package_env) = render_pipeline::typst_package_env(&config) {
@@ -152,7 +154,9 @@ pub async fn export_as_image(
     let result_path = output_path.to_string_lossy().to_string();
 
     // Emit success event
-    app_handle.emit(&format!("exported-{}", format), result_path.clone()).ok();
+    app_handle
+        .emit(&format!("exported-{}", format), result_path.clone())
+        .ok();
 
     Ok(result_path)
 }

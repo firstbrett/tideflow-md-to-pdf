@@ -5,6 +5,7 @@ mod preferences;
 mod preprocessor;
 mod render_pipeline;
 mod renderer;
+mod tikz;
 mod utils;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
