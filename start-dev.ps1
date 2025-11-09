@@ -23,6 +23,12 @@ if (-not (Test-Path $devShell)) {
 Write-Host "Entering Visual Studio developer shell..." -ForegroundColor Yellow
 & $devShell -Arch amd64 -HostArch amd64 | Out-Null
 
+# Merge user PATH entries back in so cargo/tectonic installed per-user remain visible
+$userPath = [System.Environment]::GetEnvironmentVariable('PATH','User')
+if ($userPath) {
+    $env:PATH = "$env:PATH;$userPath"
+}
+
 $cargoBin = Join-Path $env:USERPROFILE '.cargo\bin'
 if (Test-Path $cargoBin) {
     if ($env:PATH -notlike "*$cargoBin*") {
