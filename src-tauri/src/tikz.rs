@@ -106,9 +106,12 @@ fn compile_block(
 ) -> Result<Vec<u8>> {
     let (extracted_preamble, body) = split_tikz_preamble_from_body(&block.diagram);
 
+    // Load a few general-purpose libraries so common arrow tips/coordinate math work
+    // even when the fence doesn't specify a custom preamble.
     let mut latex = String::from(
         r"\documentclass[border=2pt]{standalone}
 \usepackage{tikz}
+\usetikzlibrary{arrows.meta,calc,positioning}
 ",
     );
 
