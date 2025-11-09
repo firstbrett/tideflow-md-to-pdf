@@ -22,7 +22,7 @@ const StatusBar: React.FC = () => {
     }
 
     if (compileStatus.status === 'error') {
-      return 'Render failed - check preview for details';
+      return compileStatus.message ?? 'Render failed - check preview for details';
     }
 
     if (modified) {

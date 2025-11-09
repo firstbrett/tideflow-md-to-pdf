@@ -8,6 +8,7 @@ import { renderTypst, cleanupTempPdfs } from '../api';
 import type { SourceMap, SyncMode } from '../types';
 import type { EditorStateRefs } from './useEditorState';
 import { logger } from '../utils/logger';
+import { deriveRenderError } from '../utils/renderErrors';
 
 // Create scoped logger
 const useContentManagementLogger = logger.createScoped('useContentManagement');
@@ -91,10 +92,11 @@ export function useContentManagement(params: UseContentManagementParams) {
       if (signal?.aborted) {
         return;
       }
+      const friendly = deriveRenderError(err, 'Auto-render failed');
       setCompileStatus({
         status: 'error',
-        message: 'Auto-render failed',
-        details: String(err)
+        message: friendly.message,
+        details: friendly.details
       });
       setSourceMap(null);
     } finally {

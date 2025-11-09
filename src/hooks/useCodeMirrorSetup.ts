@@ -5,11 +5,11 @@
 
 import { useEffect, useRef } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
-import { markdown } from '@codemirror/lang-markdown';
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { keymap } from '@codemirror/view';
 import { search, searchKeymap, closeSearchPanel, openSearchPanel } from '@codemirror/search';
 import { StateField, Annotation, Prec, Compartment } from '@codemirror/state';
-import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
+import { syntaxHighlighting, HighlightStyle, StreamLanguage, type StreamParser } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { TIMING } from '../constants/timing';
 import { cmd } from '../components/commands';
@@ -171,6 +171,43 @@ export function useCodeMirrorSetup(params: UseCodeMirrorSetupParams) {
       { tag: tags.punctuation, class: 'cm-punctuation' },
     ]);
 
+    const tikzStreamParser: StreamParser<null> = {
+      token(stream) {
+        if (stream.eatSpace()) {
+          return null;
+        }
+
+        if (stream.match('%')) {
+          stream.skipToEnd();
+          return 'comment';
+        }
+
+        if (stream.match(/\\[a-zA-Z@]+/)) {
+          return 'keyword';
+        }
+
+        if (stream.match(/[[\]{}]/)) {
+          return 'bracket';
+        }
+
+        if (stream.match(/\d+(\.\d+)?/)) {
+          return 'number';
+        }
+
+        stream.next();
+        return null;
+      },
+    };
+
+    const tikzLanguageSupport = StreamLanguage.define(tikzStreamParser);
+    const tikzMarkdownExtension = markdownLanguage.data.of({
+      codeLanguages: [{
+        name: 'tikz',
+        alias: ['pgf', 'tikzpicture'],
+        support: tikzLanguageSupport,
+      }],
+    });
+
     const view = new EditorView({
       doc: content,
       extensions: [
@@ -179,6 +216,7 @@ export function useCodeMirrorSetup(params: UseCodeMirrorSetupParams) {
         // ====================================================================
         basicSetup,
         markdown(), // Markdown language support
+        tikzMarkdownExtension,
         EditorView.lineWrapping,
 
         // Custom syntax highlighting - APPLY THIS TO MAKE COLORS WORK!
