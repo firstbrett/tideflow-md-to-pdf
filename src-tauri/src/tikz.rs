@@ -1,7 +1,7 @@
 use crate::preprocessor::TikzBlockMeta;
 use crate::utils;
 use anyhow::{anyhow, Context, Result};
-use image::ImageOutputFormat;
+use image as image_crate;
 use log::error;
 use pdfium_render::prelude::*;
 use sha2::{Digest, Sha256};
@@ -104,34 +104,86 @@ fn compile_block(
     cache_key: &str,
     block: &TikzBlockMeta,
 ) -> Result<Vec<u8>> {
+    let (extracted_preamble, body) = split_tikz_preamble_from_body(&block.diagram);
+
     let mut latex = String::from(
         r"\documentclass[border=2pt]{standalone}
 \usepackage{tikz}
 ",
     );
 
-    if let Some(preamble) = block.preamble.as_ref() {
-        latex.push_str(preamble);
-        if !preamble.ends_with('\n') {
+    if let Some(user_preamble) = block.preamble.as_ref() {
+        latex.push_str(user_preamble);
+        if !user_preamble.ends_with('\n') {
+            latex.push('\n');
+        }
+    }
+    if !extracted_preamble.is_empty() {
+        latex.push_str(&extracted_preamble);
+        if !extracted_preamble.ends_with('\n') {
             latex.push('\n');
         }
     }
 
-    latex.push_str(
-        r"\begin{document}
-",
-    );
-    latex.push_str(&block.diagram);
-    if !block.diagram.ends_with('\n') {
+    latex.push_str("\\begin{document}\n");
+    latex.push_str(&body);
+    if !body.ends_with('\n') {
         latex.push('\n');
     }
-    latex.push_str(
-        r"\end{document}
-",
-    );
+    latex.push_str("\\end{document}\n");
 
     let pdf_bytes = compile_tex(tectonic_path, work_dir, cache_key, &latex)?;
     pdf_bytes_to_png(pdfium, &pdf_bytes)
+}
+
+fn split_tikz_preamble_from_body(diagram: &str) -> (String, String) {
+    let mut preamble_lines = Vec::new();
+    let mut body_lines = Vec::new();
+
+    // Heuristics: move any obvious preamble commands to the preamble, no matter
+    // where they appear in the fence. Also strip any stray document begin/end.
+    for line in diagram.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            body_lines.push(line);
+            continue;
+        }
+        // Skip document delimiters entirely
+        if trimmed.starts_with("\\begin{document}") || trimmed.starts_with("\\end{document}") {
+            continue;
+        }
+
+        // Identify preamble-only markers if they appear anywhere in the line
+        let is_preamble_only = [
+            "\\documentclass",
+            "\\usepackage",
+            "\\RequirePackage",
+            "\\PassOptionsToPackage",
+            "\\usetikzlibrary",
+        ]
+        .iter()
+        .any(|needle| trimmed.contains(needle));
+
+        if is_preamble_only {
+            preamble_lines.push(line);
+        } else {
+            body_lines.push(line);
+        }
+    }
+
+    let mut preamble = preamble_lines.join("\n");
+    if !preamble.is_empty() && !preamble.ends_with('\n') {
+        preamble.push('\n');
+    }
+    let mut body = body_lines.join("\n");
+
+    // If user provided bare drawing commands, wrap them in a tikzpicture env.
+    let has_tikz_env = body.contains("\\begin{tikzpicture}") || body.contains("\\end{tikzpicture}");
+    if !has_tikz_env && !body.trim().is_empty() {
+        body = format!("\\begin{{tikzpicture}}\n{}\n\\end{{tikzpicture}}\n", body);
+    }
+
+    (preamble, body)
 }
 
 fn compile_tex(
@@ -142,6 +194,13 @@ fn compile_tex(
 ) -> Result<Vec<u8>> {
     let tex_path = work_dir.join(format!("{base_name}.tex"));
     fs::write(&tex_path, tex_source)?;
+
+    // Also emit a developer-visible copy for debugging in workspace when running dev.
+    if let Ok(cwd) = std::env::current_dir() {
+        let dbg_dir = cwd.join("src-tauri").join("gen_debug").join("tikz");
+        let _ = fs::create_dir_all(&dbg_dir);
+        let _ = fs::write(dbg_dir.join(format!("{base_name}.tex")), tex_source);
+    }
 
     let output_dir = work_dir.join("out");
     fs::create_dir_all(&output_dir)?;
@@ -218,12 +277,12 @@ fn pdf_bytes_to_png(pdfium: &Pdfium, pdf_bytes: &[u8]) -> Result<Vec<u8>> {
         .map_err(|_| anyhow!("TikZ PDF did not contain any pages"))?;
 
     let dpi = 288.0;
-    let width_px = ((page.width().value() / 72.0) * dpi)
+    let width_px = ((page.width().value / 72.0) * dpi)
         .clamp(1.0, 4096.0)
-        .round() as u32;
-    let height_px = ((page.height().value() / 72.0) * dpi)
+        .round() as i32;
+    let height_px = ((page.height().value / 72.0) * dpi)
         .clamp(1.0, 4096.0)
-        .round() as u32;
+        .round() as i32;
 
     let render_config = PdfRenderConfig::new()
         .set_target_width(width_px)
@@ -237,10 +296,19 @@ fn pdf_bytes_to_png(pdfium: &Pdfium, pdf_bytes: &[u8]) -> Result<Vec<u8>> {
         .map_err(|e| anyhow!("Failed to rasterize TikZ PDF: {e}"))?;
 
     let image = bitmap.as_image();
+    let rgba = image.to_rgba8();
+    let (w, h) = (rgba.width(), rgba.height());
+    let data = rgba.into_raw();
+
     let mut png_bytes = Vec::new();
-    image
-        .write_to(&mut Cursor::new(&mut png_bytes), ImageOutputFormat::Png)
-        .map_err(|e| anyhow!("Failed to encode TikZ PNG: {e}"))?;
+    {
+        let mut cursor = Cursor::new(&mut png_bytes);
+        let mut encoder = image_crate::codecs::png::PngEncoder::new(&mut cursor);
+        use image_crate::ColorType;
+        encoder
+            .encode(&data, w, h, ColorType::Rgba8)
+            .map_err(|e| anyhow!("Failed to encode TikZ PNG: {e}"))?;
+    }
 
     Ok(png_bytes)
 }

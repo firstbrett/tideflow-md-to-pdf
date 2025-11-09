@@ -1,5 +1,8 @@
 // Main Tideflow Typst template (lean, preference-driven)
 #import "@preview/cmarker:0.1.6": render
+// For LaTeX math in Markdown ($...$ / $$...$$), use mitex.
+// If unavailable, builds may fail to render equations; consider bundling offline.
+#import "@preview/mitex:0.2.4": mitex
 #import "themes/registry.typ": get-theme
 
 #let prefs = json("prefs.json")
@@ -224,6 +227,7 @@
 
 #render(md_content,
   smart-punctuation: false,
+  math: mitex,
   scope: (
     // Override link to use our safe version
     link: safe-link,
