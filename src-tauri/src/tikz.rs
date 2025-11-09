@@ -1,4 +1,4 @@
-use crate::preprocessor::{TikzBlockMeta, TikzRequestedFormat};
+use crate::preprocessor::TikzBlockMeta;
 use crate::utils;
 use anyhow::{anyhow, Context, Result};
 use log::error;
@@ -91,7 +91,7 @@ fn compile_block(
     block: &TikzBlockMeta,
 ) -> Result<Vec<u8>> {
     let mut latex = String::from(
-        r"\documentclass[tikz,border=2pt]{standalone}
+        r"\documentclass[border=2pt]{standalone}
 \usepackage{tikz}
 ",
     );

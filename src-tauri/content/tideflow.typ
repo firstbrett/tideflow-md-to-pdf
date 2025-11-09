@@ -21,11 +21,11 @@
 
 #let tikz_render(
   asset: str,
-  scale := auto,
+  scale: auto,
   format: str = "vector",
 ) = {
   let graphic = image(asset)
-  if scale == auto || type(scale) == str {
+  if scale == auto or type(scale) == str {
     graphic
   } else {
     scale(x: scale, y: scale)[graphic]
