@@ -1,5 +1,6 @@
 // Main Tideflow Typst template (lean, preference-driven)
 #import "@preview/cmarker:0.1.6": render
+#import "@preview/tikz:0.1.0": tikz
 #import "themes/registry.typ": get-theme
 
 #let prefs = json("prefs.json")
@@ -18,6 +19,18 @@
 // the anchor helper does not need to produce any output; it just needs to
 // exist in the scope when `render` is called.
 #let anchor = id => none
+
+#let tikz_render(
+  diagram: str,
+  scale: auto = none,
+  preamble: str = "",
+  format: str = "vector",
+) = tikz.render(
+  diagram: diagram,
+  scale: scale,
+  preamble: preamble,
+  format: format,
+)
 
 #let admonition-colors = (
   "note": (fill: color.mix(accent-color, rgb(255, 255, 255)), stroke: accent-color),
