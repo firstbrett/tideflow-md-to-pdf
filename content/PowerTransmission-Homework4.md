@@ -125,6 +125,8 @@ b) $L_{mi} = 1.675 \times 10^{-3} \, \frac{\text{H}}{\text{mi}}$
 $X_L = 2\pi f L_{mi} = (2\pi)(60)(1.675 \times 10^{-3}) = \boxed{0.631 \, \frac{\Omega}{\text{mi}}}$
 
 ```tikz
+% --- Figure ---
+\begin{center}
 \begin{tikzpicture}[scale=0.75, transform shape]
     % Colors
     \colorlet{inbandcolor}{gray!80}
@@ -195,4 +197,87 @@ $X_L = 2\pi f L_{mi} = (2\pi)(60)(1.675 \times 10^{-3}) = \boxed{0.631 \, \frac{
     \draw[-{Stealth[length=2mm]}] (-1.5, -4) -- (-0.8, -4);
     \node[anchor=east] at (-1.2, -4) {$-40$ dB limit};
 \end{tikzpicture}
+\end{center}
+
+    \vspace{0.5em}
+    $\rightarrow$ Primarily \textbf{filters} after the power amplifier. The \textbf{modulator} (pulse shaping) and amplifier \textbf{linearity} also contribute to minimizing their generation.
+\end{enumerate}
+
+% --- Questions 13–19 ---
+\begin{enumerate}[label=\arabic*., leftmargin=*, start=13, itemsep=8pt]
+    \item What is the most common receiver type for MTI / Pulsed Doppler radars?
+
+    \vspace{0.5em}
+    $\rightarrow$ \boxed{\text{Superheterodyne Receiver}}
+
+    \item Define a duplexer.
+
+    \vspace{0.5em}
+    $\rightarrow$ A device that allows a single antenna to be used for both transmitting and receiving, protecting the receiver from the high-power transmitter.
+
+    \item Define a circulator.
+
+    \vspace{0.5em}
+    $\rightarrow$ A passive, non-reciprocal three-port device that routes a signal from port 1 to port 2, from port 2 to port 3, and from port 3 to port 1.
+
+    \item What are the differences between a circulator and a duplexer?
+
+    \vspace{0.5em}
+    $\rightarrow$ A duplexer is a general function (often a switch for pulsed radar), while a circulator is a specific component that provides this function by directing signal flow. Circulators are full-duplex capable but offer less isolation than a dedicated high-power switch.
+
+    \item Discuss in a few sentences the concept of a channelized receiver.
+
+    \vspace{0.5em}
+    $\rightarrow$ A channelized receiver uses a bank of parallel filters to divide a wide operational bandwidth into many smaller, simultaneous channels. This allows for monitoring a wide spectrum at once.
+
+    \item Find two commercial ADC converters that can sample at least 1 GHz and provide 9+ bits ENOB. Hint: See Table 11.1.
+
+    \vspace{0.5em}
+    $\rightarrow$ \textbf{Analog Devices AD9208}: 3 GSps, 9.7 ENOB
+
+    \vspace{0.5em}
+    $\rightarrow$ \textbf{Texas Instruments ADC32RF45}: 3 GSps, 10.2 ENOB
+
+    \item Draw a sketch and discuss (2--3 sentences) the concept of OP1dB and IP1dB.
+
+    \vspace{0.5em}
+    $\rightarrow$
+    \begin{center}
+    \begin{tikzpicture}[scale=0.9, transform shape]
+        % Axes
+        \draw[->, thick] (-0.5,0) -- (6,0) node[anchor=north west] {RF Input Power (dBm)};
+        \draw[->, thick] (0,-3) -- (0,5) node[anchor=south east] {IF Output Power (dBm)};
+    
+        % Define conversion loss
+        \def\loss{-2}
+    
+        % Ideal Line
+        \draw[dotted, thick] (0,\loss) -- (5, 5+\loss);
+        \node[blue, above, sloped, pos=0.5] at (2.5, 2.5+\loss) {Ideal 1:1 Slope};
+        
+        % Measured Curve
+        \draw[solid, thick, blue] (0,\loss) .. controls (2, 2+\loss) and (3.5, 3.3+\loss) .. (5.5, 3.8+\loss);
+        \node[below, sloped, pos=0.6] at (3.5, 3.3+\loss) {Measured Curve};
+        
+        % Compression Point Coordinates
+        \def\ipval{4}
+        \def\opval{3.5+\loss}
+        \def\opideal{4+\loss}
+        
+        % Dashed lines and labels for P1dB
+        \draw[dashed] (\ipval, -3) -- (\ipval, \opval);
+        \node[draw, fill=white, text width=2.5cm, align=center, font=\small] at (\ipval, -2) {Input 1 dB Compression Point};
+        
+        % 1 dB annotation
+        \draw[dashed] (\ipval, \opval) -- (0, \opval);
+        \draw[<->, thick] (\ipval+0.2, \opval) -- (\ipval+0.2, \opideal);
+        \draw[dashed] (\ipval, \opideal) -- (\ipval+0.2, \opideal);
+        \node[right] at (\ipval+0.2, \opideal-0.5) {1 dB};
+        
+        % Conversion Loss annotation
+        \node[draw, fill=white] at (-2, -1) {Conversion Loss};
+        \draw[decorate, decoration={brace, amplitude=5pt}] (-0.3,0) -- (-0.3,\loss);
+        
+    \end{tikzpicture}
+    \end{center}
 ```

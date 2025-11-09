@@ -239,7 +239,7 @@ fn compile_tex(
     Ok(bytes)
 }
 
-const TIKZ_PIPELINE_CACHE_VERSION: u32 = 1;
+const TIKZ_PIPELINE_CACHE_VERSION: u32 = 2;
 
 fn cache_key(block: &TikzBlockMeta) -> String {
     let mut hasher = Sha256::new();
