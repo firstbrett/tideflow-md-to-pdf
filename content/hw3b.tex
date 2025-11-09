@@ -8,7 +8,7 @@
 \usepackage{enumitem}
 \usepackage{xcolor}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta, shapes.geometric, decorations.pathmorphing}
+\usetikzlibrary{arrows.meta, shapes.geometric, decorations.pathmorphing, decorations.pathreplacing}
 
 % --- TikZ Styles ---
 \tikzstyle{element}=[draw, circle, inner sep=1pt, fill=gray!20]
@@ -16,7 +16,6 @@
 \tikzstyle{divider}=[draw, circle, inner sep=0pt, minimum size=4pt]
 \tikzstyle{amp}=[draw, regular polygon, regular polygon sides=3, shape border rotate=0, inner sep=0pt, minimum size=7pt]
 \tikzstyle{source}=[draw, circle, minimum size=6pt, label={[label distance=-1mm]center:\tiny RF}]
-
 
 % --- Fancy header/footer (fixed) ---
 \usepackage{fancyhdr}
@@ -184,7 +183,6 @@ Place MATLAB code at end of assignment in an appendix. You do not need to turn i
 
     \item Referring to the figure, what parts of the radar system help control out-of-band and spurious emissions?
 
-
 % --- Figure ---
 \begin{center}
 \begin{tikzpicture}[scale=0.75, transform shape]
@@ -259,7 +257,6 @@ Place MATLAB code at end of assignment in an appendix. You do not need to turn i
 \end{tikzpicture}
 \end{center}
 
-
     \vspace{0.5em}
     $\rightarrow$ Primarily \textbf{filters} after the power amplifier. The \textbf{modulator} (pulse shaping) and amplifier \textbf{linearity} also contribute to minimizing their generation.
 \end{enumerate}
@@ -302,7 +299,6 @@ Place MATLAB code at end of assignment in an appendix. You do not need to turn i
     \item Draw a sketch and discuss (2--3 sentences) the concept of OP1dB and IP1dB.
 
     \vspace{0.5em}
-    $\rightarrow$
     \begin{center}
     \begin{tikzpicture}[scale=0.9, transform shape]
         % Axes
@@ -341,7 +337,8 @@ Place MATLAB code at end of assignment in an appendix. You do not need to turn i
         
     \end{tikzpicture}
     \end{center}
-    
+
+    $\rightarrow$
     The 1 dB compression point (P1dB) marks the limit of an amplifier's linear range. \textbf{IP1dB} is the input power that causes gain to drop by 1 dB, and \textbf{OP1dB} is the corresponding output power.
 \end{enumerate}
 

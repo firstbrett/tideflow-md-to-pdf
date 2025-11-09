@@ -47,10 +47,21 @@ export async function renderPdfPages(
       canvas.className = 'pdfjs-page-canvas';
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
+      const devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2.5);
+      const outputScale = devicePixelRatio > 1 ? devicePixelRatio : 1;
+      const scaledWidth = Math.floor(viewport.width * outputScale);
+      const scaledHeight = Math.floor(viewport.height * outputScale);
+      canvas.width = scaledWidth;
+      canvas.height = scaledHeight;
+      canvas.style.width = `${viewport.width}px`;
+      canvas.style.height = `${viewport.height}px`;
       tmpWrap.appendChild(canvas);
-      await page.render({ canvasContext: ctx, viewport }).promise;
+      const renderContext: pdfjsLib.PDFRenderParams = {
+        canvasContext: ctx,
+        viewport,
+        transform: outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : undefined,
+      };
+      await page.render(renderContext).promise;
     })();
     pagePromises.push(p);
   }
