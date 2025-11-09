@@ -156,6 +156,13 @@ fn split_tikz_preamble_from_body(diagram: &str) -> (String, String) {
             continue;
         }
 
+        // Drop neutral layout wrappers like center environments. The standalone class used
+        // for TikZ snippets does not support \begin{center}...\end{center}, so we elide them to
+        // avoid LaTeX "missing \item" errors that stop compilation.
+        if trimmed.starts_with("\\begin{center}") || trimmed.starts_with("\\end{center}") {
+            continue;
+        }
+
         // Identify preamble-only markers if they appear anywhere in the line
         let is_preamble_only = [
             "\\documentclass",
@@ -239,7 +246,7 @@ fn compile_tex(
     Ok(bytes)
 }
 
-const TIKZ_PIPELINE_CACHE_VERSION: u32 = 2;
+const TIKZ_PIPELINE_CACHE_VERSION: u32 = 3;
 
 fn cache_key(block: &TikzBlockMeta) -> String {
     let mut hasher = Sha256::new();
