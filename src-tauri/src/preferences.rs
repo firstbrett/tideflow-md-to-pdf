@@ -13,10 +13,10 @@ lazy_static! {
 }
 
 /// User preferences for document rendering and application behavior.
-/// 
+///
 /// This struct is serialized to/from JSON and must stay in sync with
 /// the TypeScript `Preferences` interface in src/types.ts.
-/// 
+///
 /// Field names use snake_case in Rust but may be renamed during serialization
 /// to match Typst conventions (e.g., `number_sections` → `numberSections`).
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -24,112 +24,111 @@ pub struct Preferences {
     /// Typst theme template identifier (e.g., "tideflow", "article")
     #[serde(default = "default_theme_id")]
     pub theme_id: String,
-    
+
     /// Paper size (e.g., "us-letter", "a4") - renamed from paper_size for Typst
     pub papersize: String,
-    
+
     /// Page margins - renamed from margins for Typst compatibility
     pub margin: Margins,
-    
+
     /// Enable table of contents generation
     pub toc: bool,
-    
+
     /// Custom heading for table of contents (empty string = no heading)
     #[serde(default)]
     pub toc_title: String,
-    
+
     /// Enable two-column layout for table of contents
     #[serde(default)]
     pub toc_two_column: bool,
-    
+
     /// Enable two-column layout for main document content
     #[serde(default)]
     pub two_column_layout: bool,
-    
+
     /// Enable cover page
     #[serde(default)]
     pub cover_page: bool,
-    
+
     /// Cover page title text
     #[serde(default)]
     pub cover_title: String,
-    
+
     /// Cover page author/writer text
     #[serde(default)]
     pub cover_writer: String,
-    
+
     /// Path to cover page image (relative to content dir)
     #[serde(default)]
     pub cover_image: String,
-    
+
     /// Cover image width (e.g., "80%", "320px")
     #[serde(default = "default_cover_image_width")]
     pub cover_image_width: String,
-    
+
     /// Enable automatic section numbering - serialized as "numberSections" for Typst
     #[serde(rename = "numberSections")]
     pub number_sections: bool,
-    
+
     /// Default width for inserted images (e.g., "80%", "320px")
     pub default_image_width: String,
-    
+
     /// Default image alignment ("left", "center", "right")
     pub default_image_alignment: String,
-    
+
     /// Font configuration for main text and monospace code
     pub fonts: Fonts,
-    
+
     /// Base font size in points
     #[serde(default = "default_font_size")]
     pub font_size: f32,
-    
+
     /// Page background color (hex format, e.g., "#ffffff")
     #[serde(default = "default_page_bg_color")]
     pub page_bg_color: String,
-    
+
     /// Text color (hex format, e.g., "#000000")
     #[serde(default = "default_font_color")]
     pub font_color: String,
-    
+
     /// Heading size multiplier (1.0 = normal)
     #[serde(default = "default_heading_scale")]
     pub heading_scale: f32,
-    
+
     /// Accent color for links and UI elements (hex format)
     #[serde(default = "default_accent_color")]
     pub accent_color: String,
-    
+
     /// Line height multiplier (e.g., 1.5 = 150%)
     #[serde(default = "default_line_height")]
     pub line_height: f32,
-    
+
     /// Paragraph spacing (e.g., "0.5em", "10pt")
     #[serde(default = "default_paragraph_spacing")]
     pub paragraph_spacing: String,
-    
+
     /// Enable page numbers in footer
     #[serde(default)]
     pub page_numbers: bool,
-    
+
     /// Show document title in header
     #[serde(default)]
     pub header_title: bool,
-    
+
     /// Custom header text (overrides title if set)
     #[serde(default)]
     pub header_text: String,
-    
+
     // Preview optimization settings
-    
     /// Debounce delay in milliseconds before re-rendering on edit
     pub render_debounce_ms: u32,
-    
+
     /// Enable focused preview mode (deprecated, kept for compatibility)
     pub focused_preview_enabled: bool,
-    
+
     /// Preserve scroll position between renders
     pub preserve_scroll_position: bool,
-    
+
     /// Show confirmation dialog when closing with unsaved changes
     #[serde(default = "default_confirm_exit")]
     pub confirm_exit_on_unsaved: bool,

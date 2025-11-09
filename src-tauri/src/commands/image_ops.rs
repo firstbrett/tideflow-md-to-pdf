@@ -18,19 +18,18 @@ pub async fn import_image(
     } else {
         image_data
     };
-    
+
     // Decode base64 image data
     let image_bytes = base64::engine::general_purpose::STANDARD
         .decode(base64_data)
         .map_err(|e| format!("Failed to decode image: {}", e))?;
-    
+
     // Get assets directory
-    let assets_dir = utils::get_assets_dir(&app_handle)
-        .map_err(|e| e.to_string())?;
-    
+    let assets_dir = utils::get_assets_dir(&app_handle).map_err(|e| e.to_string())?;
+
     // Ensure assets directory exists
     fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
-    
+
     // Generate unique filename if not provided
     let filename = match file_name {
         Some(name) => utils::sanitize_filename(&name),
@@ -39,13 +38,13 @@ pub async fn import_image(
             format!("image-{}.png", uuid)
         }
     };
-    
+
     // Construct full path
     let image_path = assets_dir.join(&filename);
-    
+
     // Write image to file
     fs::write(&image_path, image_bytes).map_err(|e| e.to_string())?;
-    
+
     // Return relative path for Markdown insertion
     Ok(format!("assets/{}", filename))
 }

@@ -33,13 +33,19 @@ pub async fn typst_diagnostics(app_handle: AppHandle) -> Result<TypstDiagnostics
     let mut attempted_paths: Vec<String> = Vec::new();
     let (detected, err_msg) = match utils::get_typst_path(&app_handle) {
         Ok(p) => (Some(p.display().to_string()), None),
-        Err(e) => (None, Some(e.to_string()))
+        Err(e) => (None, Some(e.to_string())),
     };
-    
+
     if detected.is_none() {
         // Reconstruct attempted paths like utils does
         if let Ok(app_dir) = utils::get_app_dir(&app_handle) {
-            let platform_dir = if cfg!(target_os = "windows") { "windows" } else if cfg!(target_os = "macos") { "macos" } else { "linux" };
+            let platform_dir = if cfg!(target_os = "windows") {
+                "windows"
+            } else if cfg!(target_os = "macos") {
+                "macos"
+            } else {
+                "linux"
+            };
             let platform_base = app_dir.join("bin").join("typst").join(platform_dir);
             if cfg!(target_os = "windows") {
                 attempted_paths.push(platform_base.join("typst.exe").display().to_string());
@@ -59,17 +65,16 @@ pub async fn typst_diagnostics(app_handle: AppHandle) -> Result<TypstDiagnostics
 /// Debug helper: inspect where preferences are stored and what the renderer likely used last.
 #[tauri::command]
 pub async fn debug_paths(app_handle: AppHandle) -> Result<DebugPathsResponse, String> {
-    let content_dir = utils::get_content_dir(&app_handle)
-        .map_err(|e| e.to_string())?;
+    let content_dir = utils::get_content_dir(&app_handle).map_err(|e| e.to_string())?;
     let build_dir = content_dir.join(".build");
     let prefs_path = content_dir.join("prefs.json");
     let build_prefs_path = build_dir.join("prefs.json");
 
     // Load current logical preferences via API (source of truth at time of call)
-    let prefs_struct = preferences::get_preferences(app_handle.clone()).await
+    let prefs_struct = preferences::get_preferences(app_handle.clone())
+        .await
         .map_err(|e| e)?;
-    let prefs_json = serde_json::to_value(&prefs_struct)
-        .map_err(|e| e.to_string())?;
+    let prefs_json = serde_json::to_value(&prefs_struct).map_err(|e| e.to_string())?;
 
     // Attempt to read build prefs (may not exist if no render yet)
     let build_prefs_json = if build_prefs_path.exists() {
@@ -77,7 +82,9 @@ pub async fn debug_paths(app_handle: AppHandle) -> Result<DebugPathsResponse, St
             Ok(txt) => serde_json::from_str(&txt).ok(),
             Err(_) => None,
         }
-    } else { None };
+    } else {
+        None
+    };
 
     Ok(DebugPathsResponse {
         content_dir: content_dir.to_string_lossy().to_string(),

@@ -46,36 +46,13 @@ pub struct PreprocessorOutput {
     pub tikz_blocks: Vec<TikzBlockMeta>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TikzRequestedFormat {
-    Vector,
-    RasterPng,
-}
-
 #[derive(Debug, Clone)]
 pub struct TikzBlockMeta {
     pub id: String,
     pub diagram: String,
     pub preamble: Option<String>,
-    pub requested_format: TikzRequestedFormat,
     pub asset_path: String,
     pub asset_extension: &'static str,
-}
-
-impl TikzRequestedFormat {
-    fn from_option(value: Option<&str>) -> Self {
-        match value {
-            Some(v) if v.eq_ignore_ascii_case("png") => TikzRequestedFormat::RasterPng,
-            _ => TikzRequestedFormat::Vector,
-        }
-    }
-
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            TikzRequestedFormat::Vector => "vector",
-            TikzRequestedFormat::RasterPng => "png",
-        }
-    }
 }
 
 /// Transform user markdown by injecting invisible Typst anchors used for scroll synchronisation.
@@ -168,7 +145,6 @@ fn inject_tikz_blocks(markdown: &str) -> TikzTransformResult {
 struct TikzFenceOptions {
     scale: Option<String>,
     preamble: Option<String>,
-    format: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -224,11 +200,6 @@ fn parse_tikz_fence(info: &CowStr<'_>) -> Option<TikzFenceOptions> {
                         options.preamble = Some(value);
                     }
                 }
-                "format" => {
-                    if let Some(value) = normalized_value {
-                        options.format = Some(value);
-                    }
-                }
                 _ => {}
             }
         }
@@ -238,13 +209,11 @@ fn parse_tikz_fence(info: &CowStr<'_>) -> Option<TikzFenceOptions> {
 }
 
 fn build_tikz_placeholder(block: &TikzBlockInProgress) -> (String, TikzBlockMeta) {
-    let requested_format = TikzRequestedFormat::from_option(block.options.format.as_deref());
     let asset_extension = "pdf";
     let asset_path = format!("tikz/{}.{}", block.id, asset_extension);
 
     let mut args = Vec::new();
     args.push(format!("asset: \"{}\"", asset_path));
-    args.push(format!("format: \"{}\"", requested_format.as_str()));
     if let Some(scale) = block.options.scale.as_ref() {
         if !scale.trim().is_empty() {
             args.push(format!("scale: {}", format_scale_value(scale)));
@@ -262,7 +231,6 @@ fn build_tikz_placeholder(block: &TikzBlockInProgress) -> (String, TikzBlockMeta
         id: block.id.clone(),
         diagram: block.content.clone(),
         preamble: block.options.preamble.clone(),
-        requested_format,
         asset_path,
         asset_extension,
     };
@@ -424,7 +392,6 @@ mod tests {
         let options = parse_tikz_fence(&info).expect("tikz fence should parse");
         assert_eq!(options.scale.as_deref(), Some("0.75"));
         assert_eq!(options.preamble.as_deref(), Some(r"\usetikzlibrary{calc}"));
-        assert_eq!(options.format.as_deref(), Some("vector"));
     }
 
     #[test]
@@ -440,7 +407,6 @@ mod tests {
         let transformed = inject_tikz_blocks(markdown);
         assert!(transformed.markdown.contains("#tikz_render"));
         assert!(transformed.markdown.contains("scale: auto"));
-        assert!(transformed.markdown.contains("format: \"png\""));
         assert!(!transformed.markdown.contains("```tikz"));
         assert_eq!(transformed.blocks.len(), 1);
         let meta = &transformed.blocks[0];
@@ -450,7 +416,6 @@ mod tests {
         );
         assert!(meta.asset_path.starts_with("tikz/"));
         assert_eq!(meta.asset_extension, "pdf");
-        assert_eq!(meta.requested_format.as_str(), "png");
     }
 }
 

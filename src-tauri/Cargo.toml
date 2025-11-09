@@ -39,6 +39,7 @@ lazy_static = "1.4.0"
 pulldown-cmark = { version = "0.9", default-features = false, features = ["simd"] }
 sha2 = "0.10"
 hex = "0.4"
+pdfium-render = { version = "0.8.36", features = ["pdfium-binaries"] }
 
 [profile.release]
 # Reduce codegen units to 1 and enable LTO for smaller, faster release builds.

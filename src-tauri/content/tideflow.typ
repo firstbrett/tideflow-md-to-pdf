@@ -19,12 +19,8 @@
 // exist in the scope when `render` is called.
 #let anchor = id => none
 
-#let tikz_render(
-  asset: str,
-  scale: auto,
-  format: str = "vector",
-) = {
-  let graphic = image(asset)
+#let tikz_render(asset: str, scale: auto) = {
+  let graphic = image(asset, format: "pdf")
   if scale == auto or type(scale) == str {
     graphic
   } else {
@@ -231,6 +227,7 @@
   scope: (
     // Override link to use our safe version
     link: safe-link,
+    tikz_render: tikz_render,
   ),
   // Note: cmarker 0.1.6 follows standard Markdown line break rules:
   // - Single newline = soft break (ignored in output)

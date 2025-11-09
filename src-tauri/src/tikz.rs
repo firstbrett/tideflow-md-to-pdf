@@ -168,7 +168,6 @@ fn cache_key(block: &TikzBlockMeta) -> String {
     if let Some(preamble) = block.preamble.as_ref() {
         hasher.update(preamble.as_bytes());
     }
-    hasher.update(block.requested_format.as_str().as_bytes());
     hex::encode(hasher.finalize())
 }
 

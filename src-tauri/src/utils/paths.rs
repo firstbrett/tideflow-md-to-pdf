@@ -239,8 +239,7 @@ pub fn get_tectonic_path(app_handle: &AppHandle) -> Result<PathBuf> {
     }
 
     Err(anyhow!(
-        "Tectonic binary not found. Install it system-wide (e.g. `winget install Tectonic.Tectonic`) \
-or place the executable at one of: {}",
+        "Tectonic binary not found. Install it system-wide or place the executable in: {}",
         attempted
             .iter()
             .map(|p| p.display().to_string())

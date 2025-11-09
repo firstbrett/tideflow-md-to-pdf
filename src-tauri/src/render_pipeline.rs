@@ -1,9 +1,8 @@
 /// Shared rendering pipeline utilities to eliminate duplication across render functions.
-/// 
+///
 /// This module extracts common setup logic for preferences, templates, assets, and Typst
 /// compilation that was previously duplicated 3x across render_markdown, export_markdown,
 /// and render_typst functions.
-
 use crate::utils;
 use anyhow::{anyhow, Result};
 use serde_json::Value as JsonValue;
@@ -20,8 +19,8 @@ use std::os::windows::process::CommandExt;
 pub struct RenderConfig<'a> {
     pub app_handle: &'a AppHandle,
     pub build_dir: PathBuf,
-    pub content_dir: PathBuf,  // App's content directory (for templates/prefs)
-    pub typst_root: PathBuf,   // Root directory for Typst compilation
+    pub content_dir: PathBuf, // App's content directory (for templates/prefs)
+    pub typst_root: PathBuf,  // Root directory for Typst compilation
 }
 
 /// Result of preferences setup including updated JSON value
@@ -67,7 +66,11 @@ pub(crate) fn typst_package_env(config: &RenderConfig) -> Option<String> {
     if paths.is_empty() {
         None
     } else {
-        let separator = if cfg!(target_os = "windows") { ";" } else { ":" };
+        let separator = if cfg!(target_os = "windows") {
+            ";"
+        } else {
+            ":"
+        };
         let joined = paths
             .iter()
             .map(|p| p.to_string_lossy())
@@ -94,16 +97,17 @@ fn ensure_cmarker_assets(config: &RenderConfig) {
             let lib = package_root.join("lib.typ");
 
             if !(manifest.exists() && wasm.exists() && lib.exists()) {
-                if let Some(source_root) = collect_typst_package_paths(config)
-                    .into_iter()
-                    .find_map(|root| {
-                        let candidate = root.join("preview").join("cmarker").join("0.1.6");
-                        if candidate.exists() {
-                            Some(candidate)
-                        } else {
-                            None
-                        }
-                    })
+                if let Some(source_root) =
+                    collect_typst_package_paths(config)
+                        .into_iter()
+                        .find_map(|root| {
+                            let candidate = root.join("preview").join("cmarker").join("0.1.6");
+                            if candidate.exists() {
+                                Some(candidate)
+                            } else {
+                                None
+                            }
+                        })
                 {
                     let _ = fs::create_dir_all(&package_root);
                     let _ = copy_directory(&source_root, &package_root);
@@ -183,49 +187,49 @@ fn sync_theme_assets(template_src: &Path, build_dir: &Path) -> Result<()> {
 /// Returns the correct extension for the detected format.
 fn detect_image_format(path: &Path) -> Result<Option<&'static str>> {
     use std::io::Read;
-    
+
     let mut file = fs::File::open(path)?;
     let mut header = [0u8; 12];
     let bytes_read = file.read(&mut header)?;
-    
+
     if bytes_read < 4 {
         return Ok(None);
     }
-    
+
     // PNG: 89 50 4E 47
     if header[0..4] == [0x89, 0x50, 0x4E, 0x47] {
         return Ok(Some("png"));
     }
-    
+
     // JPEG: FF D8 FF
     if header[0..3] == [0xFF, 0xD8, 0xFF] {
         return Ok(Some("jpg"));
     }
-    
+
     // GIF: 47 49 46
     if header[0..3] == [0x47, 0x49, 0x46] {
         return Ok(Some("gif"));
     }
-    
+
     // WebP: RIFF....WEBP
-    if bytes_read >= 12 && header[0..4] == [0x52, 0x49, 0x46, 0x46] && header[8..12] == [0x57, 0x45, 0x42, 0x50] {
+    if bytes_read >= 12
+        && header[0..4] == [0x52, 0x49, 0x46, 0x46]
+        && header[8..12] == [0x57, 0x45, 0x42, 0x50]
+    {
         return Ok(Some("webp"));
     }
-    
+
     // BMP: 42 4D
     if header[0..2] == [0x42, 0x4D] {
         return Ok(Some("bmp"));
     }
-    
+
     Ok(None)
 }
 
 /// Handle cover image path rewriting and copying to assets directory.
 /// Returns the updated prefs JSON value with cover_image path rewritten if necessary.
-fn handle_cover_image(
-    prefs_val: &mut JsonValue,
-    app_handle: &AppHandle,
-) -> Result<()> {
+fn handle_cover_image(prefs_val: &mut JsonValue, app_handle: &AppHandle) -> Result<()> {
     if let Some(ci) = prefs_val.get("cover_image").and_then(|v| v.as_str()) {
         if !ci.is_empty() && !ci.starts_with("/assets/") {
             let mut img_path = PathBuf::from(ci);
@@ -237,35 +241,41 @@ fn handle_cover_image(
             }
             if img_path.exists() {
                 let assets_dir = utils::get_assets_dir(app_handle)?;
-                
+
                 // Detect actual image format and correct extension if needed
                 let detected_ext = detect_image_format(&img_path)?;
-                
+
                 // Get filename stem, fallback to "image" if path has no filename
                 let stem = img_path
                     .file_stem()
                     .map(|s| s.to_string_lossy().to_string())
                     .unwrap_or_else(|| "image".to_string());
-                
+
                 // Use detected extension if available, otherwise keep original
                 let correct_ext = if let Some(ext) = detected_ext {
                     ext
                 } else {
-                    img_path.extension().and_then(|e| e.to_str()).unwrap_or("jpg")
+                    img_path
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .unwrap_or("jpg")
                 };
-                
+
                 let mut fname = utils::sanitize_filename(&format!("{}.{}", stem, correct_ext));
                 let mut dest = assets_dir.join(&fname);
-                
+
                 // Deduplicate if necessary
                 let mut counter: u32 = 1;
                 while dest.exists() {
-                    fname = utils::sanitize_filename(&format!("{}-{}.{}", stem, counter, correct_ext));
+                    fname =
+                        utils::sanitize_filename(&format!("{}-{}.{}", stem, counter, correct_ext));
                     dest = assets_dir.join(&fname);
                     counter += 1;
-                    if counter > 1000 { break; }
+                    if counter > 1000 {
+                        break;
+                    }
                 }
-                
+
                 fs::copy(&img_path, &dest)?;
                 prefs_val["cover_image"] = JsonValue::String(format!("/assets/{}", fname));
             }
@@ -278,7 +288,7 @@ fn handle_cover_image(
 /// write to build directory, and emit debug events.
 pub fn setup_prefs(config: &RenderConfig, path_type: &str) -> Result<PrefsSetupResult> {
     let canonical_prefs = config.content_dir.join("prefs.json");
-    
+
     let mut prefs_val = if canonical_prefs.exists() {
         let txt = fs::read_to_string(&canonical_prefs)?;
         config.app_handle.emit("prefs-dump", &txt).ok();
@@ -286,13 +296,19 @@ pub fn setup_prefs(config: &RenderConfig, path_type: &str) -> Result<PrefsSetupR
     } else {
         JsonValue::Object(serde_json::Map::new())
     };
-    
+
     // Handle cover image rewriting
     handle_cover_image(&mut prefs_val, config.app_handle)?;
-    
+
     // Emit render-debug event
-    let toc_flag = prefs_val.get("toc").and_then(|v| v.as_bool()).unwrap_or(true);
-    let num_flag = prefs_val.get("numberSections").and_then(|v| v.as_bool()).unwrap_or(true);
+    let toc_flag = prefs_val
+        .get("toc")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+    let num_flag = prefs_val
+        .get("numberSections")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
     let dbg = serde_json::json!({
         "path_type": path_type,
         "toc": toc_flag,
@@ -301,11 +317,11 @@ pub fn setup_prefs(config: &RenderConfig, path_type: &str) -> Result<PrefsSetupR
         "timestamp": chrono::Utc::now().to_rfc3339(),
     });
     config.app_handle.emit("render-debug", dbg).ok();
-    
+
     // Write to build directory
     let prefs_json = serde_json::to_string_pretty(&prefs_val)?;
     fs::write(config.build_dir.join("prefs.json"), &prefs_json)?;
-    
+
     Ok(PrefsSetupResult {
         prefs_json: prefs_val,
     })
@@ -334,21 +350,21 @@ pub fn setup_template(config: &RenderConfig, path_type: &str) -> Result<()> {
             }
         }
     }
-    
+
     if !template_src.exists() {
         return Err(anyhow!(
             "tideflow.typ template not found at {}",
             template_src.display()
         ));
     }
-    
+
     // Copy template to build directory
     let template_dst = config.build_dir.join("tideflow.typ");
     fs::copy(&template_src, &template_dst)?;
-    
+
     // Sync theme assets
     sync_theme_assets(&template_src, &config.build_dir)?;
-    
+
     // Emit template inspection event
     if let Ok(tpl_txt) = fs::read_to_string(&template_src) {
         let snippet: String = tpl_txt.chars().take(400).collect();
@@ -361,7 +377,7 @@ pub fn setup_template(config: &RenderConfig, path_type: &str) -> Result<()> {
             "timestamp": chrono::Utc::now().to_rfc3339()
         });
         config.app_handle.emit("template-inspect", evt).ok();
-        
+
         if !has_conditional {
             let warn = serde_json::json!({
                 "warning": "Template missing '#if prefs.toc' conditional; TOC will always show.",
@@ -371,22 +387,18 @@ pub fn setup_template(config: &RenderConfig, path_type: &str) -> Result<()> {
             config.app_handle.emit("template-warning", warn).ok();
         }
     }
-    
+
     Ok(())
 }
 
 /// Compile Typst to PDF with proper error handling and timeout
-pub fn compile_typst(
-    config: &RenderConfig,
-    typst_path: &Path,
-    output_file: &str,
-) -> Result<()> {
+pub fn compile_typst(config: &RenderConfig, typst_path: &Path, output_file: &str) -> Result<()> {
     ensure_cmarker_assets(config);
     let package_env = typst_package_env(config);
 
     // Spawn process with timeout (30 seconds)
     use std::time::Duration;
-    
+
     let mut command = typst_command(typst_path);
     command.current_dir(&config.build_dir);
     command.args([
@@ -405,11 +417,11 @@ pub fn compile_typst(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
-    
+
     // Wait with timeout
     let timeout = Duration::from_secs(30);
     let start = std::time::Instant::now();
-    
+
     let status = loop {
         match child.try_wait()? {
             Some(status) => break status,
@@ -427,7 +439,7 @@ pub fn compile_typst(
         // On error, capture output for detailed error reporting
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
-        
+
         if let Some(mut out) = child.stdout.take() {
             let _ = std::io::Read::read_to_end(&mut out, &mut stdout);
         }
@@ -445,7 +457,7 @@ pub fn compile_typst(
             stderr_str.trim()
         ));
     }
-    
+
     let output_path = config.build_dir.join(output_file);
     if !output_path.exists() {
         return Err(anyhow!(
@@ -453,6 +465,6 @@ pub fn compile_typst(
             output_path.display()
         ));
     }
-    
+
     Ok(())
 }
