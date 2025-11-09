@@ -7,6 +7,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { writeMarkdownFile, renderTypst } from '../api';
 import { scrubRawTypstAnchors } from '../utils/scrubAnchors';
 import { handleError } from '../utils/errorHandler';
+import { deriveRenderError } from '../utils/renderErrors';
 import { getScrollElement } from '../types/codemirror';
 import { programmaticUpdateAnnotation } from './useCodeMirrorSetup';
 import type { SourceMap } from '../types';
@@ -81,10 +82,11 @@ export function useFileOperations(params: UseFileOperationsParams) {
         setPreviewVisible(true);
       }
     } catch (err) {
+      const friendly = deriveRenderError(err, 'Rendering failed');
       setCompileStatus({
         status: 'error',
-        message: 'Rendering failed',
-        details: String(err)
+        message: friendly.message,
+        details: friendly.details
       });
       setSourceMap(null);
     }
