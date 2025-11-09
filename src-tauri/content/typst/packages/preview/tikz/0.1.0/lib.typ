@@ -7,7 +7,7 @@
   preamble: str = "",
   format: str = "vector",
 ) = {
-  let scale-label = if scale == none {
+  let scale-label = if scale == auto {
     text(size: 8pt, fill: gray)[Scale: auto]
   } else {
     text(size: 8pt, fill: gray)[Scale: #str(scale)]
