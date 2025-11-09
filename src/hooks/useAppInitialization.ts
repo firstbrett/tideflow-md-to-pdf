@@ -70,7 +70,7 @@ export function useAppInitialization() {
               // Filter out invalid paths
               if (!f || f === 'instructions.md' || f === 'sample.md') return false;
               // Basic path validation - must have a proper extension and be a path
-              if (!f.match(/\.(md|qmd)$/i) || !f.includes('/') && !f.includes('\\')) return false;
+              if (!f.match(/\.(md|qmd|tex)$/i) || (!f.includes('/') && !f.includes('\\'))) return false;
               return true;
             });
 

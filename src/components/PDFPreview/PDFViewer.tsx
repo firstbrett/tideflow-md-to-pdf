@@ -57,7 +57,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
     content = (
       <div className="no-pdf-message">
         <p>No document open</p>
-        <p>Open a markdown file to see the PDF preview</p>
+        <p>Open a Markdown or LaTeX file to see the PDF preview</p>
       </div>
     );
   } else {

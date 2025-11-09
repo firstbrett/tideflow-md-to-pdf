@@ -5,6 +5,7 @@ mod preferences;
 mod preprocessor;
 mod render_pipeline;
 mod renderer;
+mod tex;
 mod tikz;
 mod utils;
 
@@ -35,6 +36,7 @@ pub fn run() {
             commands::export_markdown,
             commands::save_pdf_as,
             commands::render_typst,
+            commands::render_latex,
             commands::export_as_png,
             commands::export_as_svg,
             commands::typst_diagnostics,

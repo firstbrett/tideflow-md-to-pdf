@@ -10,6 +10,7 @@ import { save, open } from '@tauri-apps/plugin-dialog';
 import { handleError, showSuccess } from '../utils/errorHandler';
 import { readMarkdownFile, createFile, writeMarkdownFile, exportAsPng, exportAsSvg } from '../api';
 import { scrubRawTypstAnchors } from '../utils/scrubAnchors';
+import { detectDocumentKind } from '../utils/document';
 import './Toolbar.css';
 
 const Toolbar: React.FC = () => {
@@ -38,6 +39,7 @@ const Toolbar: React.FC = () => {
   const [saveDropdownOpen, setSaveDropdownOpen] = useState(false);
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
+  const currentDocumentKind = detectDocumentKind(editor.currentFile);
 
   React.useEffect(() => {
     const handleFullscreenChange = () => {
@@ -60,11 +62,14 @@ const Toolbar: React.FC = () => {
   // File operations
   const handleNewFile = async () => {
     try {
-      const name = prompt('Enter file name (with .md extension):');
+      const name = prompt('Enter file name (e.g., report.md or paper.tex):');
       if (!name) return;
 
       const fileName = name.includes('.') ? name : `${name}.md`;
-      const newContent = `# ${name.replace('.md', '')}\n\nStart writing your document.`;
+      const lowerName = fileName.toLowerCase();
+      const newContent = lowerName.endsWith('.tex')
+        ? `\\documentclass{article}\n\\begin{document}\n\n% Start writing here...\n\n\\end{document}\n`
+        : `# ${fileName.replace(/\.[^.]+$/, '')}\n\nStart writing your document.`;
       const filePath = await createFile(fileName);
       await writeMarkdownFile(filePath, newContent);
 
@@ -81,7 +86,10 @@ const Toolbar: React.FC = () => {
 
   const handleOpenFile = async () => {
     try {
-      const result = await open({ multiple: false, filters: [{ name: 'Markdown Files', extensions: ['md'] }] });
+      const result = await open({
+        multiple: false,
+        filters: [{ name: 'Documents', extensions: ['md', 'markdown', 'tex'] }]
+      });
       const filePath = Array.isArray(result) ? result?.[0] : result;
 
       if (filePath) {
@@ -109,7 +117,7 @@ const Toolbar: React.FC = () => {
     if (!currentFile || !modified) return;
 
     try {
-      const cleaned = scrubRawTypstAnchors(content);
+      const cleaned = currentDocumentKind === 'latex' ? content : scrubRawTypstAnchors(content);
       await writeMarkdownFile(currentFile, cleaned);
       setModified(false);
       addToast({ type: 'success', message: 'File saved successfully' });
@@ -122,15 +130,18 @@ const Toolbar: React.FC = () => {
   const handleSaveAs = async () => {
     const { currentFile, content } = editor;
     try {
-      const suggestedName = currentFile ? currentFile.split(/[\\/]/).pop() : 'document.md';
+      const fallbackName = currentDocumentKind === 'latex' ? 'document.tex' : 'document.md';
+      const suggestedName = currentFile ? currentFile.split(/[\\/]/).pop() : fallbackName;
       const filePath = await save({
         defaultPath: suggestedName,
-        filters: [{ name: 'Markdown Files', extensions: ['md'] }]
+        filters: currentDocumentKind === 'latex'
+          ? [{ name: 'LaTeX Files', extensions: ['tex'] }]
+          : [{ name: 'Markdown Files', extensions: ['md', 'markdown'] }]
       });
 
       if (!filePath) return;
 
-      const cleaned = scrubRawTypstAnchors(content);
+      const cleaned = currentDocumentKind === 'latex' ? content : scrubRawTypstAnchors(content);
       await writeMarkdownFile(filePath, cleaned);
       setCurrentFile(filePath);
       setModified(false);
@@ -146,7 +157,12 @@ const Toolbar: React.FC = () => {
   const handleExportClean = async () => {
     const { currentFile, content } = editor;
     try {
-      const baseName = currentFile ? currentFile.split(/[\\/]/).pop()?.replace('.md', '') : 'document';
+      if (currentDocumentKind === 'latex') {
+        addToast({ type: 'warning', message: 'Clean export is only available for Markdown files' });
+        return;
+      }
+      const fileLeaf = currentFile ? currentFile.split(/[\\/]/).pop() : null;
+      const baseName = fileLeaf ? fileLeaf.replace(/\.[^.]+$/, '') : 'document';
       const suggestedName = `${baseName}-clean.md`;
 
       const filePath = await save({
@@ -171,9 +187,10 @@ const Toolbar: React.FC = () => {
     if (!file) return;
     try {
       const text = await file.text();
-      const safeName = file.name.endsWith('.md') ? file.name : file.name + '.md';
+      const safeName = /\.[^.]+$/.test(file.name) ? file.name : `${file.name}.md`;
       const newPath = await createFile(safeName);
-      const cleaned = scrubRawTypstAnchors(text);
+      const importedKind = detectDocumentKind(safeName);
+      const cleaned = importedKind === 'latex' ? text : scrubRawTypstAnchors(text);
       await writeMarkdownFile(newPath, cleaned);
 
       addOpenFile(newPath);
@@ -280,7 +297,7 @@ const Toolbar: React.FC = () => {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".md,.txt,.markdown"
+        accept=".md,.txt,.markdown,.tex"
         onChange={handleFallbackChange}
         className="hidden-file-input"
         aria-hidden="true"

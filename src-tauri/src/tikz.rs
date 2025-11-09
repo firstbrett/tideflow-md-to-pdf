@@ -1,4 +1,5 @@
 use crate::preprocessor::TikzBlockMeta;
+use crate::tex::tectonic_command;
 use crate::utils;
 use anyhow::{anyhow, Context, Result};
 use image as image_crate;
@@ -9,11 +10,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::io::Cursor;
 use std::path::Path;
-use std::process::Command;
 use tauri::AppHandle;
-
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
 
 /// Ensure all TikZ assets referenced in the current markdown exist in the build directory.
 /// Compiles each diagram with the external Tectonic CLI and caches the PDF output so that
@@ -353,18 +350,4 @@ fn escape_latex_text(input: &str) -> String {
             _ => vec![ch],
         })
         .collect()
-}
-
-fn tectonic_command(exe: &Path) -> Command {
-    #[cfg(target_os = "windows")]
-    {
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        let mut cmd = Command::new(exe);
-        cmd.creation_flags(CREATE_NO_WINDOW);
-        cmd
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        Command::new(exe)
-    }
 }

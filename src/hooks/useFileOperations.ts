@@ -4,13 +4,13 @@
  */
 
 import { useEffect, useCallback, useRef } from 'react';
-import { writeMarkdownFile, renderTypst } from '../api';
+import { writeMarkdownFile, renderTypst, renderLatex } from '../api';
 import { scrubRawTypstAnchors } from '../utils/scrubAnchors';
 import { handleError } from '../utils/errorHandler';
 import { deriveRenderError } from '../utils/renderErrors';
 import { getScrollElement } from '../types/codemirror';
 import { programmaticUpdateAnnotation } from './useCodeMirrorSetup';
-import type { SourceMap } from '../types';
+import type { DocumentKind, SourceMap } from '../types';
 import type { EditorStateRefs } from './useEditorState';
 import { logger } from '../utils/logger';
 
@@ -28,6 +28,7 @@ interface CompileStatus {
 interface UseFileOperationsParams {
   editorStateRefs: EditorStateRefs;
   currentFile: string | null;
+  documentKind: DocumentKind;
   content: string;
   modified: boolean;
   sourceMap: SourceMap | null;
@@ -45,6 +46,7 @@ export function useFileOperations(params: UseFileOperationsParams) {
   const {
     editorStateRefs,
     currentFile,
+    documentKind,
     content,
     modified,
     sourceMap,
@@ -70,7 +72,9 @@ export function useFileOperations(params: UseFileOperationsParams) {
   const handleRender = useCallback(async (setPreviewVisible?: (visible: boolean) => void) => {
     try {
       setCompileStatus({ status: 'running' });
-      const document = await renderTypst(content, 'pdf', currentFile);
+      const document = documentKind === 'latex'
+        ? await renderLatex(content, currentFile)
+        : await renderTypst(content, 'pdf', currentFile);
       setSourceMap(document.sourceMap);
       setCompileStatus({
         status: 'ok',
@@ -90,7 +94,7 @@ export function useFileOperations(params: UseFileOperationsParams) {
       });
       setSourceMap(null);
     }
-  }, [content, currentFile, setCompileStatus, setSourceMap]);
+  }, [content, currentFile, documentKind, setCompileStatus, setSourceMap]);
 
   // Save the file
   const handleSave = useCallback(async (setIsSaving: (saving: boolean) => void, addToast?: (toast: { type: 'success' | 'error' | 'warning' | 'info'; message: string }) => void) => {
@@ -101,7 +105,7 @@ export function useFileOperations(params: UseFileOperationsParams) {
       // Strip invisible raw-typst anchors before saving so the persisted
       // markdown doesn't contain those injected tokens which can interfere
       // with copy/paste and other tooling.
-      const cleaned = scrubRawTypstAnchors(content);
+      const cleaned = documentKind === 'latex' ? content : scrubRawTypstAnchors(content);
       await writeMarkdownFile(currentFile, cleaned);
       setModified(false);
 
@@ -121,7 +125,7 @@ export function useFileOperations(params: UseFileOperationsParams) {
     } finally {
       setIsSaving(false);
     }
-  }, [currentFile, modified, content, setModified, handleRender]);
+  }, [currentFile, modified, content, documentKind, setModified, handleRender]);
 
   // Load file content ONLY when switching to a different file, not on every keystroke.
   // Use generation tracking to prevent race conditions on rapid file switches.

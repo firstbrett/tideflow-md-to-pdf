@@ -4,8 +4,8 @@
  */
 
 import { useCallback } from 'react';
-import { renderTypst, cleanupTempPdfs } from '../api';
-import type { SourceMap, SyncMode } from '../types';
+import { renderTypst, renderLatex, cleanupTempPdfs } from '../api';
+import type { DocumentKind, SourceMap, SyncMode } from '../types';
 import type { EditorStateRefs } from './useEditorState';
 import { logger } from '../utils/logger';
 import { deriveRenderError } from '../utils/renderErrors';
@@ -24,6 +24,7 @@ interface CompileStatus {
 interface UseContentManagementParams {
   editorStateRefs: EditorStateRefs;
   currentFile: string | null;
+  documentKind: DocumentKind;
   sourceMap: SourceMap | null;
   setCompileStatus: (status: CompileStatus) => void;
   setSourceMap: (map: SourceMap | null) => void;
@@ -34,6 +35,7 @@ export function useContentManagement(params: UseContentManagementParams) {
   const {
     editorStateRefs,
     currentFile,
+    documentKind,
     sourceMap,
     setCompileStatus,
     setSourceMap,
@@ -62,7 +64,9 @@ export function useContentManagement(params: UseContentManagementParams) {
       const wasSourceMapNull = !sourceMap;
       setCompileStatus({ status: 'running' });
 
-      const document = await renderTypst(content, 'pdf', currentFile);
+      const document = documentKind === 'latex'
+        ? await renderLatex(content, currentFile)
+        : await renderTypst(content, 'pdf', currentFile);
 
       // Check if operation was cancelled after async operation
       if (signal?.aborted) {
@@ -111,6 +115,7 @@ export function useContentManagement(params: UseContentManagementParams) {
     }
   }, [
     currentFile,
+    documentKind,
     setCompileStatus,
     setSourceMap,
     sourceMap,
@@ -123,4 +128,3 @@ export function useContentManagement(params: UseContentManagementParams) {
     handleAutoRender,
   };
 }
-

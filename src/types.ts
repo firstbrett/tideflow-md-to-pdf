@@ -69,6 +69,8 @@ export interface EditorState {
   compileStatus: CompileStatus;
 }
 
+export type DocumentKind = 'markdown' | 'latex';
+
 export type SyncMode = 'auto' | 'two-way' | 'locked-to-pdf' | 'locked-to-editor';
 
 export interface EditorLocation {

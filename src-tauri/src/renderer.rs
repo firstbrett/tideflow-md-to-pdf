@@ -3,13 +3,15 @@ use crate::preprocessor::{
     SourceMapPayload,
 };
 use crate::render_pipeline::{self, RenderConfig};
+use crate::tex;
 use crate::tikz;
 use crate::utils;
 use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tauri::{AppHandle, Emitter};
@@ -524,4 +526,127 @@ pub async fn render_typst(
         pdf_path: output_path.to_string_lossy().to_string(),
         source_map,
     })
+}
+
+pub async fn render_latex(
+    app_handle: &AppHandle,
+    content: &str,
+    current_file: Option<&str>,
+) -> Result<RenderedDocument> {
+    // Ensure only one render happens at once so we don't thrash the filesystem
+    let _lock = RENDER_MUTEX.lock().await;
+
+    let tectonic_path = utils::get_tectonic_path(app_handle).context(
+        "Tectonic binary not found. Please install or bundle Tectonic to enable LaTeX rendering.",
+    )?;
+
+    let content_dir = utils::get_content_dir(app_handle)?;
+    let build_dir = content_dir.join(".build");
+    fs::create_dir_all(&build_dir)?;
+    let latex_dir = build_dir.join("latex");
+    fs::create_dir_all(&latex_dir)?;
+
+    let uuid = uuid::Uuid::new_v4();
+    let preview_base = format!("temp_{}", uuid);
+    let final_pdf = latex_dir.join(format!("{}.pdf", preview_base));
+
+    let (working_dir, temp_tex_path) =
+        prepare_latex_preview_file(current_file, &latex_dir, &preview_base);
+
+    fs::write(&temp_tex_path, content)?;
+
+    // Keep a debug copy of the generated TeX so contributors can inspect failures.
+    if let Ok(cwd) = std::env::current_dir() {
+        let dbg_dir = cwd.join("src-tauri").join("gen_debug").join("latex");
+        let _ = fs::create_dir_all(&dbg_dir);
+        let dbg_path = dbg_dir.join(format!("{}.tex", preview_base));
+        let _ = fs::write(&dbg_path, content);
+    }
+
+    let mut command = tex::tectonic_command(&tectonic_path);
+    command
+        .arg("--synctex=0")
+        .arg("--keep-intermediates=false")
+        .arg("--outdir")
+        .arg(&latex_dir)
+        .arg(&temp_tex_path);
+
+    if let Some(dir) = working_dir.as_ref() {
+        command.current_dir(dir);
+    }
+
+    let output = command.output()?;
+    if !output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let _ = fs::remove_file(&temp_tex_path);
+        return Err(anyhow!(
+            "Tectonic failed (status {}).\nSTDOUT:\n{}\nSTDERR:\n{}",
+            output.status,
+            stdout.trim(),
+            stderr.trim()
+        ));
+    }
+
+    let mut generated_pdf = latex_dir.join(
+        temp_tex_path
+            .file_stem()
+            .unwrap_or_else(|| OsStr::new("texput")),
+    );
+    generated_pdf.set_extension("pdf");
+
+    if !generated_pdf.exists() {
+        let _ = fs::remove_file(&temp_tex_path);
+        return Err(anyhow!(
+            "Tectonic did not produce a PDF for {}",
+            temp_tex_path.display()
+        ));
+    }
+
+    if generated_pdf != final_pdf {
+        if let Err(e) = fs::rename(&generated_pdf, &final_pdf) {
+            fs::copy(&generated_pdf, &final_pdf)?;
+            fs::remove_file(&generated_pdf).ok();
+            if final_pdf.exists() {
+                println!(
+                    "[renderer] renamed latex preview via copy because rename failed: {}",
+                    e
+                );
+            }
+        }
+    }
+
+    let _ = fs::remove_file(&temp_tex_path);
+
+    Ok(RenderedDocument {
+        pdf_path: final_pdf.to_string_lossy().to_string(),
+        source_map: SourceMapPayload::default(),
+    })
+}
+
+fn prepare_latex_preview_file(
+    current_file: Option<&str>,
+    latex_dir: &Path,
+    preview_base: &str,
+) -> (Option<PathBuf>, PathBuf) {
+    if let Some(file) = current_file {
+        let path = Path::new(file);
+        if let Some(parent) = path.parent() {
+            if parent.exists() {
+                // Reuse part of the real filename so includes relying on relative paths still resolve.
+                let stem = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("document");
+                let sanitized = stem
+                    .chars()
+                    .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+                    .collect::<String>();
+                let temp_name = format!(".tf-preview-{}-{}.tex", sanitized, preview_base);
+                return (Some(parent.to_path_buf()), parent.join(temp_name));
+            }
+        }
+    }
+
+    (None, latex_dir.join(format!("{}.tex", preview_base)))
 }

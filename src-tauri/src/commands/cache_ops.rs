@@ -104,14 +104,21 @@ pub async fn cleanup_temp_pdfs(
 
     let mut temp_pdfs = Vec::new();
 
-    // Find all temp_*.pdf files
-    if let Ok(entries) = fs::read_dir(&build_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                if name.starts_with("temp_") && name.ends_with(".pdf") {
-                    if let Ok(metadata) = entry.metadata() {
-                        temp_pdfs.push((path, metadata));
+    let mut search_dirs = vec![build_dir.clone(), build_dir.join("latex")];
+    search_dirs.dedup();
+
+    for dir in search_dirs {
+        if !dir.exists() {
+            continue;
+        }
+        if let Ok(entries) = fs::read_dir(&dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if name.starts_with("temp_") && name.ends_with(".pdf") {
+                        if let Ok(metadata) = entry.metadata() {
+                            temp_pdfs.push((path, metadata));
+                        }
                     }
                 }
             }

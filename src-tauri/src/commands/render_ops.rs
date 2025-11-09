@@ -102,6 +102,24 @@ pub async fn render_typst(
     }
 }
 
+#[tauri::command]
+pub async fn render_latex(
+    app_handle: AppHandle,
+    content: &str,
+    current_file: Option<&str>,
+) -> Result<RenderedDocument, String> {
+    match renderer::render_latex(&app_handle, content, current_file).await {
+        Ok(document) => {
+            let _ = app_handle.emit("compiled", &document);
+            Ok(document)
+        }
+        Err(e) => {
+            let _ = app_handle.emit("compile-error", e.to_string());
+            Err(e.to_string())
+        }
+    }
+}
+
 /// Export the current document as PNG
 #[tauri::command]
 pub async fn export_as_png(

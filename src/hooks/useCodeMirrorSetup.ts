@@ -8,17 +8,63 @@ import { EditorView, basicSetup } from 'codemirror';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { keymap } from '@codemirror/view';
 import { search, searchKeymap, closeSearchPanel, openSearchPanel } from '@codemirror/search';
-import { StateField, Annotation, Prec, Compartment } from '@codemirror/state';
+import { StateField, Annotation, Prec, Compartment, type Extension } from '@codemirror/state';
 import { syntaxHighlighting, HighlightStyle, StreamLanguage, type StreamParser } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { TIMING } from '../constants/timing';
 import { cmd } from '../components/commands';
 import { scrubRawTypstAnchors } from '../utils/scrubAnchors';
 import { getScrollElement, type ScrollElementWithHandler } from '../types/codemirror';
+import type { DocumentKind } from '../types';
 import type { EditorStateRefs } from './useEditorState';
 import { logger } from '../utils/logger';
+import { stex } from '@codemirror/legacy-modes/mode/stex';
 
 const useCodeMirrorSetupLogger = logger.createScoped('useCodeMirrorSetup');
+
+const tikzStreamParser: StreamParser<null> = {
+  token(stream) {
+    if (stream.eatSpace()) {
+      return null;
+    }
+
+    if (stream.match('%')) {
+      stream.skipToEnd();
+      return 'comment';
+    }
+
+    if (stream.match(/\\[a-zA-Z@]+/)) {
+      return 'keyword';
+    }
+
+    if (stream.match(/[[\]{}]/)) {
+      return 'bracket';
+    }
+
+    if (stream.match(/\d+(\.\d+)?/)) {
+      return 'number';
+    }
+
+    stream.next();
+    return null;
+  },
+};
+
+const tikzLanguageSupport = StreamLanguage.define(tikzStreamParser);
+const tikzMarkdownExtension = markdownLanguage.data.of({
+  codeLanguages: [{
+    name: 'tikz',
+    alias: ['pgf', 'tikzpicture'],
+    support: tikzLanguageSupport,
+  }],
+});
+
+const getLanguageExtensions = (kind: DocumentKind): Extension => {
+  if (kind === 'latex') {
+    return [StreamLanguage.define(stex)];
+  }
+  return [markdown(), tikzMarkdownExtension];
+};
 
 // ============================================================================
 // Custom Annotations for Transaction Tracking
@@ -80,10 +126,12 @@ const editorCustomState = StateField.define<{
  * Allows dynamic reconfiguration of search panel settings without recreating editor.
  */
 const searchConfigCompartment = new Compartment();
+const languageCompartment = new Compartment();
 
 interface UseCodeMirrorSetupParams {
   editorStateRefs: EditorStateRefs;
   content: string;
+  documentKind: DocumentKind;
   setContent: (content: string) => void;
   setModified: (modified: boolean) => void;
   setIsTyping: (typing: boolean) => void;
@@ -99,6 +147,7 @@ export function useCodeMirrorSetup(params: UseCodeMirrorSetupParams) {
   const {
     editorStateRefs,
     content,
+    documentKind,
     setContent,
     setModified,
     setIsTyping,
@@ -125,6 +174,13 @@ export function useCodeMirrorSetup(params: UseCodeMirrorSetupParams) {
   useEffect(() => {
     renderDebounceRef.current = renderDebounceMs;
   }, [renderDebounceMs]);
+
+  useEffect(() => {
+    if (!editorStateRefs.editorViewRef.current) return;
+    editorStateRefs.editorViewRef.current.dispatch({
+      effects: languageCompartment.reconfigure(getLanguageExtensions(documentKind)),
+    });
+  }, [documentKind, editorStateRefs.editorViewRef]);
 
   // Track if we've initialized the editor
   const initializedRef = useRef(false);
@@ -171,42 +227,6 @@ export function useCodeMirrorSetup(params: UseCodeMirrorSetupParams) {
       { tag: tags.punctuation, class: 'cm-punctuation' },
     ]);
 
-    const tikzStreamParser: StreamParser<null> = {
-      token(stream) {
-        if (stream.eatSpace()) {
-          return null;
-        }
-
-        if (stream.match('%')) {
-          stream.skipToEnd();
-          return 'comment';
-        }
-
-        if (stream.match(/\\[a-zA-Z@]+/)) {
-          return 'keyword';
-        }
-
-        if (stream.match(/[[\]{}]/)) {
-          return 'bracket';
-        }
-
-        if (stream.match(/\d+(\.\d+)?/)) {
-          return 'number';
-        }
-
-        stream.next();
-        return null;
-      },
-    };
-
-    const tikzLanguageSupport = StreamLanguage.define(tikzStreamParser);
-    const tikzMarkdownExtension = markdownLanguage.data.of({
-      codeLanguages: [{
-        name: 'tikz',
-        alias: ['pgf', 'tikzpicture'],
-        support: tikzLanguageSupport,
-      }],
-    });
 
     const view = new EditorView({
       doc: content,
@@ -215,8 +235,7 @@ export function useCodeMirrorSetup(params: UseCodeMirrorSetupParams) {
         // Core Extensions
         // ====================================================================
         basicSetup,
-        markdown(), // Markdown language support
-        tikzMarkdownExtension,
+        languageCompartment.of(getLanguageExtensions(documentKind)),
         EditorView.lineWrapping,
 
         // Custom syntax highlighting - APPLY THIS TO MAKE COLORS WORK!

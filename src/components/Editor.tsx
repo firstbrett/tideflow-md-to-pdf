@@ -22,6 +22,7 @@ import { useEditorLifecycle } from '../hooks/useEditorLifecycle';
 import { showOpenDialog, readMarkdownFile } from '../api';
 import { INSTRUCTIONS_DOC } from '../instructionsDoc';
 import { handleError } from '../utils/errorHandler';
+import { detectDocumentKind, isMarkdownFile, isLatexFile } from '../utils/document';
 import { listen } from '@tauri-apps/api/event';
 
 const Editor: React.FC = () => {
@@ -48,6 +49,7 @@ const Editor: React.FC = () => {
     addOpenFile,
   } = useEditorStore();
   const preferences = usePreferencesStore((state) => state.preferences);
+  const documentKind = detectDocumentKind(currentFile);
 
   // Local state
   const [, setIsSaving] = useState(false);
@@ -78,6 +80,7 @@ const Editor: React.FC = () => {
   const { handleAutoRender } = useContentManagement({
     editorStateRefs,
     currentFile,
+    documentKind,
     sourceMap,
     setCompileStatus,
     setSourceMap,
@@ -88,6 +91,7 @@ const Editor: React.FC = () => {
   const { handleSave: handleSaveBase, handleRender } = useFileOperations({
     editorStateRefs,
     currentFile,
+    documentKind,
     content,
     modified,
     sourceMap,
@@ -111,6 +115,7 @@ const Editor: React.FC = () => {
   useCodeMirrorSetup({
     editorStateRefs,
     content,
+    documentKind,
     setContent,
     setModified,
     setIsTyping,
@@ -212,7 +217,7 @@ const Editor: React.FC = () => {
           console.log('[Editor] Dropped on editor:', droppedOnEditor);
 
           // Check if it's a markdown file
-          if (filePath.endsWith('.md') || filePath.endsWith('.markdown')) {
+          if (isMarkdownFile(filePath) || isLatexFile(filePath)) {
             try {
               // If dropped on editor area, insert content at cursor
               if (droppedOnEditor && editorStateRefs.editorViewRef.current) {
@@ -346,8 +351,8 @@ const Editor: React.FC = () => {
   const handleOpenFile = async () => {
     try {
       const result = await showOpenDialog([{
-        name: 'Markdown',
-        extensions: ['md', 'markdown']
+        name: 'Documents',
+        extensions: ['md', 'markdown', 'tex']
       }]);
 
       if (result && result.length > 0) {

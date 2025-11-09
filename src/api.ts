@@ -136,6 +136,14 @@ async function invokeRenderTypst(args: RenderArgs): Promise<RenderedDocument> {
   return normalizeRenderedDocument(result);
 }
 
+export async function renderLatex(content: string, currentFile?: string | null): Promise<RenderedDocument> {
+  const result: BackendRenderedDocument = await invoke('render_latex', {
+    content,
+    currentFile: currentFile || null
+  });
+  return normalizeRenderedDocument(result);
+}
+
 async function processRenderQueue(): Promise<void> {
   if (renderQueue.inFlight) return;
 
