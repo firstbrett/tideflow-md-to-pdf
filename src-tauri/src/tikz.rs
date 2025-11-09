@@ -236,8 +236,11 @@ fn compile_tex(
     Ok(bytes)
 }
 
+const TIKZ_PIPELINE_CACHE_VERSION: u32 = 1;
+
 fn cache_key(block: &TikzBlockMeta) -> String {
     let mut hasher = Sha256::new();
+    hasher.update(TIKZ_PIPELINE_CACHE_VERSION.to_le_bytes());
     hasher.update(block.diagram.as_bytes());
     if let Some(preamble) = block.preamble.as_ref() {
         hasher.update(preamble.as_bytes());

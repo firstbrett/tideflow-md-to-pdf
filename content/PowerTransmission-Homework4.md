@@ -38,7 +38,6 @@ Figure 4.32 shows the conductor configuration of a completely transposed three-p
 **Diagram:**
 
 ```tikz
-\begin{document}
 \begin{tikzpicture}
         % 1. Define all nodes (coordinates snapped to nearest 0.25)
         \node (0) at (-1, -1.25) {};
@@ -107,9 +106,7 @@ Figure 4.32 shows the conductor configuration of a completely transposed three-p
         \draw [->] (39) to (40);
         \draw [->] (41) to (42);
 \end{tikzpicture}
-\end{document}
 ```
-
 
 $r = 0.0074 \, \text{m}$, $d = 0.3 \, \text{m}$, $D_{ab} = 6 \, \text{m}$, $D_{bc} = 6 \, \text{m}$, $D_{ac} = 12 \, \text{m}$
 
@@ -126,3 +123,76 @@ To convert to mH/mi: $1.041 \, \frac{\text{mH}}{\text{km}} \times 1.60934 \, \fr
 b) $L_{mi} = 1.675 \times 10^{-3} \, \frac{\text{H}}{\text{mi}}$
 
 $X_L = 2\pi f L_{mi} = (2\pi)(60)(1.675 \times 10^{-3}) = \boxed{0.631 \, \frac{\Omega}{\text{mi}}}$
+
+```tikz
+\begin{tikzpicture}[scale=0.75, transform shape]
+    % Colors
+    \colorlet{inbandcolor}{gray!80}
+    \colorlet{outofbandcolor}{gray!60}
+    \colorlet{spuriouscolor}{gray!30}
+    \colorlet{unwantedcolor}{gray!50}
+    
+    % Dimensions
+    \def\ybottom{-8.5}
+    \def\spuriouslevel{-6}
+    \def\unwantedlevel{-8}
+    \def\inbandhalfwidth{0.4}
+    \def\outofbandend{3}
+    \def\spuriousend{5}
+    \def\plotwidth{5.5}
+
+    % Background regions
+    \fill[unwantedcolor] (-\plotwidth, \ybottom) rectangle (\plotwidth, \unwantedlevel);
+    \fill[spuriouscolor] (\outofbandend, \unwantedlevel) rectangle (\plotwidth, \spuriouslevel);
+    \fill[spuriouscolor] (-\plotwidth, \unwantedlevel) rectangle (-\outofbandend, \spuriouslevel);
+
+    % Out-of-band under-curve (right)
+    \fill[outofbandcolor] (\inbandhalfwidth, 0) 
+        .. controls (0.8, -2) and (1.2, -3.8) .. (1.5, -4) 
+        .. controls (2.2, -5.5) .. (\outofbandend, \spuriouslevel) 
+        -- (\outofbandend, \unwantedlevel) -- (\inbandhalfwidth, \unwantedlevel) -- cycle;
+    % Out-of-band under-curve (left)
+    \fill[outofbandcolor] (-\inbandhalfwidth, 0) 
+        .. controls (-0.8, -2) and (-1.2, -3.8) .. (-1.5, -4) 
+        .. controls (-2.2, -5.5) .. (-\outofbandend, \spuriouslevel) 
+        -- (-\outofbandend, \unwantedlevel) -- (-\inbandhalfwidth, \unwantedlevel) -- cycle;
+
+    % In-band
+    \fill[inbandcolor] (-\inbandhalfwidth, \unwantedlevel) rectangle (\inbandhalfwidth, 0);
+
+    % Grid
+    \draw[gray!50, thin] (-\plotwidth, \ybottom) grid (\plotwidth, 0.5);
+
+    % Axes
+    \draw[->, thick] (-\plotwidth-0.2, 0) -- (\plotwidth+0.2, 0);
+    \draw[->, thick] (0, \ybottom-0.2) -- (0, 0.5);
+
+    % Y ticks/labels (0, -2, -4, -6, -8 dB)
+    \foreach \yv/\lbl in {0/0,-2/-20,-4/-40,-6/-60,-8/-80} {
+        \draw (0.1, \yv) -- (-0.1, \yv) node[left] {\lbl};
+    }
+
+    % Axis labels
+    \node[rotate=90, anchor=south, text width=7cm, align=center] at (-5.7, -4)
+      {Required Suppression Relative to Power at\\ Fundamental (dB)};
+    \node at (0, -9.2) {Frequency Relative to Fundamental (MHz)};
+
+    % Region labels
+    \node[text width=2.2cm, align=center] at (3, -2.5) {In-Band or\\Necessary\\Emissions};
+    \node[text width=2cm, align=center] at (2, -7) {Out-of-Band\\Emissions};
+    \node[text width=2cm, align=center] at (-2, -7) {Out-of-Band\\Emissions};
+    \node[text width=2cm, align=center] at (4.2, -7) {Spurious\\Emissions};
+    \node[text width=2cm, align=center] at (-4.2, -7) {Spurious\\Emissions};
+    \node at (2.5, -8.25) {Unwanted Emissions};
+    \node at (-2.5, -8.25) {Unwanted Emissions};
+
+    % Annotations
+    \node[text width=4cm, align=center] at (-3, -1.5)
+      {Ultimate\\Suppression Level\\($-X$ dB; here $X=60$)};
+    \draw[-{Stealth[length=2mm]}] (-3.3, -2.5) -- (-4.3, \spuriouslevel);
+
+    % -40 dB marker
+    \draw[-{Stealth[length=2mm]}] (-1.5, -4) -- (-0.8, -4);
+    \node[anchor=east] at (-1.2, -4) {$-40$ dB limit};
+\end{tikzpicture}
+```
