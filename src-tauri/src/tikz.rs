@@ -29,11 +29,10 @@ pub fn prepare_tikz_assets(
 
     let tectonic_path = utils::get_tectonic_path(app_handle)?;
     let pdfium_lib = utils::get_pdfium_library_path(app_handle)?;
-    let pdfium = Pdfium::new(
-        Pdfium::bind_to_library(&pdfium_lib)
-            .or_else(|_| Pdfium::bind_to_system_library())
-            .map_err(|e| anyhow!("Failed to load Pdfium: {e}"))?,
-    );
+    let pdfium_bindings = Pdfium::bind_to_library(&pdfium_lib)
+        .or_else(|_| Pdfium::bind_to_system_library())
+        .map_err(|e| anyhow!("Failed to load Pdfium: {e}"))?;
+    let pdfium = Pdfium::new(pdfium_bindings);
     let cache_dir = build_dir.join("tikz-cache");
     let work_dir = build_dir.join("tikz-work");
     fs::create_dir_all(&cache_dir)?;
@@ -211,18 +210,20 @@ fn build_error_artifact(
 
 fn pdf_bytes_to_png(pdfium: &Pdfium, pdf_bytes: &[u8]) -> Result<Vec<u8>> {
     let document = pdfium
-        .load_pdf_from_bytes(pdf_bytes, None)
+        .load_pdf_from_byte_slice(pdf_bytes, None)
         .map_err(|e| anyhow!("Failed to load TikZ PDF: {e}"))?;
-    let mut pages = document.pages();
-    let page = pages
-        .next()
-        .ok_or_else(|| anyhow!("TikZ PDF did not contain any pages"))?;
+    let page = document
+        .pages()
+        .get(0)
+        .map_err(|_| anyhow!("TikZ PDF did not contain any pages"))?;
 
     let dpi = 288.0;
-    let width_px =
-        ((page.width().value() / 72.0) * dpi).clamp(1.0, 4096.0).round() as u32;
-    let height_px =
-        ((page.height().value() / 72.0) * dpi).clamp(1.0, 4096.0).round() as u32;
+    let width_px = ((page.width().value() / 72.0) * dpi)
+        .clamp(1.0, 4096.0)
+        .round() as u32;
+    let height_px = ((page.height().value() / 72.0) * dpi)
+        .clamp(1.0, 4096.0)
+        .round() as u32;
 
     let render_config = PdfRenderConfig::new()
         .set_target_width(width_px)
@@ -238,10 +239,7 @@ fn pdf_bytes_to_png(pdfium: &Pdfium, pdf_bytes: &[u8]) -> Result<Vec<u8>> {
     let image = bitmap.as_image();
     let mut png_bytes = Vec::new();
     image
-        .write_to(
-            &mut Cursor::new(&mut png_bytes),
-            ImageOutputFormat::Png,
-        )
+        .write_to(&mut Cursor::new(&mut png_bytes), ImageOutputFormat::Png)
         .map_err(|e| anyhow!("Failed to encode TikZ PNG: {e}"))?;
 
     Ok(png_bytes)
