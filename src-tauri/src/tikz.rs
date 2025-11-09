@@ -1,10 +1,13 @@
 use crate::preprocessor::TikzBlockMeta;
 use crate::utils;
 use anyhow::{anyhow, Context, Result};
+use image::ImageOutputFormat;
 use log::error;
+use pdfium_render::prelude::*;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fs;
+use std::io::Cursor;
 use std::path::Path;
 use std::process::Command;
 use tauri::AppHandle;
@@ -25,6 +28,12 @@ pub fn prepare_tikz_assets(
     }
 
     let tectonic_path = utils::get_tectonic_path(app_handle)?;
+    let pdfium_lib = utils::get_pdfium_library_path(app_handle)?;
+    let pdfium = Pdfium::new(
+        Pdfium::bind_to_library(&pdfium_lib)
+            .or_else(|_| Pdfium::bind_to_system_library())
+            .map_err(|e| anyhow!("Failed to load Pdfium: {e}"))?,
+    );
     let cache_dir = build_dir.join("tikz-cache");
     let work_dir = build_dir.join("tikz-work");
     fs::create_dir_all(&cache_dir)?;
@@ -36,20 +45,25 @@ pub fn prepare_tikz_assets(
         let key = cache_key(block);
         let cache_file = cache_dir.join(format!("{}.{}", key, block.asset_extension));
         if !cache_file.exists() {
-            match compile_block(&tectonic_path, &work_dir, &key, block) {
+            match compile_block(&tectonic_path, &pdfium, &work_dir, &key, block) {
                 Ok(bytes) => {
                     fs::write(&cache_file, bytes)?;
                 }
                 Err(err) => {
                     error!("[tikz] failed to compile block {}: {}", block.id, err);
-                    let fallback =
-                        build_error_artifact(&tectonic_path, &work_dir, &key, &err.to_string())
-                            .with_context(|| {
-                                format!(
-                                    "failed to create fallback artifact for TikZ block {}",
-                                    block.id
-                                )
-                            })?;
+                    let fallback = build_error_artifact(
+                        &tectonic_path,
+                        &pdfium,
+                        &work_dir,
+                        &key,
+                        &err.to_string(),
+                    )
+                    .with_context(|| {
+                        format!(
+                            "failed to create fallback artifact for TikZ block {}",
+                            block.id
+                        )
+                    })?;
                     fs::write(&cache_file, fallback)?;
                 }
             }
@@ -86,6 +100,7 @@ pub fn prepare_tikz_assets(
 
 fn compile_block(
     tectonic_path: &Path,
+    pdfium: &Pdfium,
     work_dir: &Path,
     cache_key: &str,
     block: &TikzBlockMeta,
@@ -116,7 +131,8 @@ fn compile_block(
 ",
     );
 
-    compile_tex(tectonic_path, work_dir, cache_key, &latex)
+    let pdf_bytes = compile_tex(tectonic_path, work_dir, cache_key, &latex)?;
+    pdf_bytes_to_png(pdfium, &pdf_bytes)
 }
 
 fn compile_tex(
@@ -173,6 +189,7 @@ fn cache_key(block: &TikzBlockMeta) -> String {
 
 fn build_error_artifact(
     tectonic_path: &Path,
+    pdfium: &Pdfium,
     work_dir: &Path,
     cache_key: &str,
     message: &str,
@@ -188,7 +205,46 @@ fn build_error_artifact(
 ",
         escaped
     );
-    compile_tex(tectonic_path, work_dir, cache_key, &latex)
+    let pdf = compile_tex(tectonic_path, work_dir, cache_key, &latex)?;
+    pdf_bytes_to_png(pdfium, &pdf)
+}
+
+fn pdf_bytes_to_png(pdfium: &Pdfium, pdf_bytes: &[u8]) -> Result<Vec<u8>> {
+    let document = pdfium
+        .load_pdf_from_bytes(pdf_bytes, None)
+        .map_err(|e| anyhow!("Failed to load TikZ PDF: {e}"))?;
+    let mut pages = document.pages();
+    let page = pages
+        .next()
+        .ok_or_else(|| anyhow!("TikZ PDF did not contain any pages"))?;
+
+    let dpi = 288.0;
+    let width_px =
+        ((page.width().value() / 72.0) * dpi).clamp(1.0, 4096.0).round() as u32;
+    let height_px =
+        ((page.height().value() / 72.0) * dpi).clamp(1.0, 4096.0).round() as u32;
+
+    let render_config = PdfRenderConfig::new()
+        .set_target_width(width_px)
+        .set_target_height(height_px)
+        .use_print_quality(true)
+        .render_annotations(true)
+        .render_form_data(true);
+
+    let bitmap = page
+        .render_with_config(&render_config)
+        .map_err(|e| anyhow!("Failed to rasterize TikZ PDF: {e}"))?;
+
+    let image = bitmap.as_image();
+    let mut png_bytes = Vec::new();
+    image
+        .write_to(
+            &mut Cursor::new(&mut png_bytes),
+            ImageOutputFormat::Png,
+        )
+        .map_err(|e| anyhow!("Failed to encode TikZ PNG: {e}"))?;
+
+    Ok(png_bytes)
 }
 
 fn truncate_message(message: &str) -> String {

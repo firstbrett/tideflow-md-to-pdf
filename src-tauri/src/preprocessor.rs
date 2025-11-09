@@ -209,7 +209,7 @@ fn parse_tikz_fence(info: &CowStr<'_>) -> Option<TikzFenceOptions> {
 }
 
 fn build_tikz_placeholder(block: &TikzBlockInProgress) -> (String, TikzBlockMeta) {
-    let asset_extension = "pdf";
+    let asset_extension = "png";
     let asset_path = format!("tikz/{}.{}", block.id, asset_extension);
 
     let mut args = Vec::new();
@@ -415,7 +415,7 @@ mod tests {
             Some(r"\usetikzlibrary{arrows.meta}")
         );
         assert!(meta.asset_path.starts_with("tikz/"));
-        assert_eq!(meta.asset_extension, "pdf");
+        assert_eq!(meta.asset_extension, "png");
     }
 }
 

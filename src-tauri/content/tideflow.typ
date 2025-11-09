@@ -20,7 +20,7 @@
 #let anchor = id => none
 
 #let tikz_render(asset: str, scale: auto) = {
-  let graphic = image(asset, format: "pdf")
+  let graphic = image(asset)
   if scale == auto or type(scale) == str {
     graphic
   } else {

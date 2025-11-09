@@ -176,6 +176,72 @@ pub fn get_typst_path(app_handle: &AppHandle) -> Result<PathBuf> {
     ))
 }
 
+/// Locate the bundled Pdfium dynamic library for the current platform.
+pub fn get_pdfium_library_path(app_handle: &AppHandle) -> Result<PathBuf> {
+    let mut candidates = Vec::new();
+
+    if let Ok(current_dir) = std::env::current_dir() {
+        candidates.push(
+            current_dir
+                .join("src-tauri")
+                .join("bin")
+                .join("pdfium")
+                .join(platform_dir())
+                .join(library_name()),
+        );
+    }
+
+    if let Ok(resource_dir) = app_handle.path().resource_dir() {
+        candidates.push(
+            resource_dir
+                .join("bin")
+                .join("pdfium")
+                .join(platform_dir())
+                .join(library_name()),
+        );
+    }
+
+    for candidate in candidates {
+        if candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err(anyhow!(
+        "Pdfium binary not found. Ensure the platform library is placed under src-tauri/bin/pdfium/<platform>/"
+    ))
+}
+
+#[cfg(target_os = "windows")]
+fn library_name() -> &'static str {
+    "pdfium.dll"
+}
+
+#[cfg(target_os = "macos")]
+fn library_name() -> &'static str {
+    "libpdfium.dylib"
+}
+
+#[cfg(target_os = "linux")]
+fn library_name() -> &'static str {
+    "libpdfium.so"
+}
+
+#[cfg(target_os = "windows")]
+fn platform_dir() -> &'static str {
+    "windows"
+}
+
+#[cfg(target_os = "macos")]
+fn platform_dir() -> &'static str {
+    "macos"
+}
+
+#[cfg(target_os = "linux")]
+fn platform_dir() -> &'static str {
+    "linux"
+}
+
 /// Locate the bundled or system Tectonic binary.
 pub fn get_tectonic_path(app_handle: &AppHandle) -> Result<PathBuf> {
     if let Ok(path_var) = std::env::var("PATH") {

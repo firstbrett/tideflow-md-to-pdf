@@ -54,7 +54,8 @@
       "content/**/*",
       "templates/**/*",
       "styles/*",
-      "bin/typst/**/*"
+      "bin/typst/**/*",
+      "bin/pdfium/**/*"
     ],
     "copyright": "© 2025 Burak Deniz Koca"
   }
