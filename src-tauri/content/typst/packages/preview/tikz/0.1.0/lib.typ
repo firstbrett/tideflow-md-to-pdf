@@ -3,7 +3,7 @@
 // dependencies are mirrored into the Tideflow distribution.
 #let render(
   diagram: str,
-  scale: auto = none,
+  scale: any = auto,
   preamble: str = "",
   format: str = "vector",
 ) = {

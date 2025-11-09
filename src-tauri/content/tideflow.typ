@@ -22,7 +22,7 @@
 
 #let tikz_render(
   diagram: str,
-  scale: auto = auto,
+  scale: any = auto,
   preamble: str = "",
   format: str = "vector",
 ) = tikz.render(
