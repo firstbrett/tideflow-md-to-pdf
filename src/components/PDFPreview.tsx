@@ -25,7 +25,7 @@ initializePdfWorker();
 
 const PDFPreview: React.FC = () => {
   // Store state
-  const { editor, sourceMap, activeAnchorId, setActiveAnchorId, syncMode, setSyncMode, isTyping } = useEditorStore();
+  const { editor, sourceMap, activeAnchorId, setActiveAnchorId, syncMode, setSyncMode, isTyping, requestCursorAt } = useEditorStore();
   const { compileStatus } = editor;
   const { pdfZoom, setPdfZoom, thumbnailsVisible } = useUIStore();
   const preferences = usePreferencesStore((state) => state.preferences);
@@ -256,6 +256,7 @@ const PDFPreview: React.FC = () => {
     rendering, // Pass state value so effect can re-run when PDF ready
     setActiveAnchorId,
     setSyncMode,
+    requestCursorAt,
   });
 
   // Pending anchor management

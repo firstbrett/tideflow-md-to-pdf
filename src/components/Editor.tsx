@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useEditorStore } from '../stores/editorStore';
 import { useUIStore } from '../stores/uiStore';
 import { usePreferencesStore } from '../stores/preferencesStore';
@@ -24,6 +24,8 @@ import { INSTRUCTIONS_DOC } from '../instructionsDoc';
 import { handleError } from '../utils/errorHandler';
 import { detectDocumentKind, isMarkdownFile, isLatexFile } from '../utils/document';
 import { listen } from '@tauri-apps/api/event';
+import { EditorSelection } from '@codemirror/state';
+import { EditorView } from 'codemirror';
 
 const Editor: React.FC = () => {
   // Store state
@@ -47,6 +49,8 @@ const Editor: React.FC = () => {
     getEditorScrollPosition,
     setCurrentFile,
     addOpenFile,
+    pendingCursorOffset,
+    requestCursorAt,
   } = useEditorStore();
   const preferences = usePreferencesStore((state) => state.preferences);
   const documentKind = detectDocumentKind(currentFile);
@@ -134,6 +138,26 @@ const Editor: React.FC = () => {
     activeAnchorId,
     setActiveAnchorId,
   });
+
+  // Respond to cursor jump requests (e.g., PDF double-click)
+  useEffect(() => {
+    if (pendingCursorOffset == null) return;
+    const view = editorStateRefs.editorViewRef.current;
+    if (!view) return;
+
+    const clamped = Math.max(0, Math.min(pendingCursorOffset, view.state.doc.length));
+    editorStateRefs.programmaticScrollRef.current = true;
+    const scrollEffect = EditorView.scrollIntoView(clamped, { y: 'center' });
+    view.dispatch({
+      selection: EditorSelection.cursor(clamped),
+      effects: scrollEffect,
+    });
+    view.focus();
+    requestAnimationFrame(() => {
+      editorStateRefs.programmaticScrollRef.current = false;
+    });
+    requestCursorAt(null);
+  }, [pendingCursorOffset, editorStateRefs, requestCursorAt]);
 
   // Use editor lifecycle hook - generation tracking
   useEditorLifecycle({

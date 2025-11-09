@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { TIMING } from '../constants/timing';
 import type { SourceMap, SyncMode } from '../types';
 import { useEditorStore } from '../stores/editorStore';
+import { findDocumentBodyRange } from '../utils/document';
 import { logger } from '../utils/logger';
 
 // Create scoped logger
@@ -34,6 +35,7 @@ interface UsePdfToEditorSyncParams {
   // Actions
   setActiveAnchorId: (id: string) => void;
   setSyncMode: (mode: SyncMode) => void;
+  requestCursorAt: (offset: number) => void;
 }
 
 export function usePdfToEditorSync(params: UsePdfToEditorSyncParams): void {
@@ -54,6 +56,7 @@ export function usePdfToEditorSync(params: UsePdfToEditorSyncParams): void {
     rendering, // State value for dependency tracking
     setActiveAnchorId,
     setSyncMode,
+    requestCursorAt,
   } = params;
 
   // Effect: Handle PDF scroll events
@@ -236,6 +239,57 @@ export function usePdfToEditorSync(params: UsePdfToEditorSyncParams): void {
     // Attach scroll listener with passive flag for performance
     el.addEventListener('scroll', handleScroll, { passive: true });
 
+    const handleDoubleClick = (event: MouseEvent) => {
+      if (event.button !== 0) return;
+      if (!sourceMapRef.current) return;
+
+      const rect = el.getBoundingClientRect();
+      const clickOffset = event.clientY - rect.top + el.scrollTop;
+      const anchorId = findClosestAnchor(clickOffset);
+      if (anchorId) {
+        const anchor = sourceMapRef.current.anchors.find((candidate) => candidate.id === anchorId);
+        if (!anchor) {
+          return;
+        }
+        requestCursorAt(anchor.editor.offset);
+        lastProgrammaticScrollAt.current = Date.now();
+        setActiveAnchorId(anchorId);
+        return;
+      }
+
+      const { editor } = useEditorStore.getState();
+      const content = editor?.content ?? '';
+      if (!content) {
+        return;
+      }
+
+      const { start: bodyStart, end: bodyEnd } = findDocumentBodyRange(content);
+      const bodyLength = Math.max(1, bodyEnd - bodyStart);
+      const totalHeight = Math.max(1, el.scrollHeight);
+      const ratio = Math.min(Math.max(clickOffset / totalHeight, 0), 1);
+      let approxOffset = bodyStart + Math.round(ratio * bodyLength);
+      approxOffset = Math.max(bodyStart, Math.min(bodyEnd - 1, approxOffset));
+
+      // Snap to nearest word boundary for better accuracy
+      const isWordChar = (ch: string) => /\w/.test(ch);
+      let left = approxOffset;
+      while (left > bodyStart && isWordChar(content[left - 1])) {
+        left--;
+      }
+      while (left < bodyEnd && /\s/.test(content[left])) {
+        left++;
+      }
+      let snapped = left;
+      if (snapped >= bodyEnd) {
+        snapped = approxOffset;
+      }
+
+      requestCursorAt(snapped);
+      lastProgrammaticScrollAt.current = Date.now();
+    };
+
+    el.addEventListener('dblclick', handleDoubleClick, { passive: false });
+
     if (process.env.NODE_ENV !== 'production') {
       syncLogger.debug('scroll listener attached to element', {
         element: el,
@@ -252,6 +306,7 @@ export function usePdfToEditorSync(params: UsePdfToEditorSyncParams): void {
     return () => {
       if (scrollTimeout) window.clearTimeout(scrollTimeout);
       el.removeEventListener('scroll', handleScroll);
+      el.removeEventListener('dblclick', handleDoubleClick);
       if (process.env.NODE_ENV !== 'production') {
         syncLogger.debug('scroll listener removed');
       }

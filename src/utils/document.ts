@@ -24,3 +24,14 @@ export function isMarkdownFile(path: string | null | undefined): boolean {
 export function isLatexFile(path: string | null | undefined): boolean {
   return latexExtensions.has(extensionOf(path));
 }
+
+export function findDocumentBodyRange(content: string): { start: number; end: number } {
+  const beginMatch = content.match(/\\begin\s*\{\s*document\s*\}/i);
+  const endMatch = content.match(/\\end\s*\{\s*document\s*\}/i);
+  const start = beginMatch ? beginMatch.index! + beginMatch[0].length : 0;
+  const end = endMatch ? endMatch.index! : content.length;
+  return {
+    start: Math.max(0, Math.min(start, content.length)),
+    end: Math.max(start, Math.min(end, content.length)),
+  };
+}

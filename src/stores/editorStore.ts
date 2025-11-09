@@ -20,6 +20,7 @@ interface EditorStoreState {
   setContent: (content: string) => void;
   setModified: (modified: boolean) => void;
   setCompileStatus: (status: CompileStatus) => void;
+  requestCursorAt: (offset: number | null) => void;
 
   // Tab management
   addOpenFile: (path: string) => void;
@@ -31,6 +32,7 @@ interface EditorStoreState {
   setSourceMap: (map: SourceMap | null) => void;
   activeAnchorId: string | null;
   setActiveAnchorId: (id: string | null) => void;
+  pendingCursorOffset: number | null;
   syncMode: SyncMode;
   setSyncMode: (mode: SyncMode) => void;
   syncEnabled: boolean;
@@ -54,6 +56,7 @@ interface EditorStoreState {
 export const useEditorStore = create<EditorStoreState>((set, get) => ({
   // Editor state
   editor: initialEditorState,
+  pendingCursorOffset: null,
 
   sourceMap: null,
   setSourceMap: (map: SourceMap | null) => set({ sourceMap: map }),
@@ -104,6 +107,7 @@ export const useEditorStore = create<EditorStoreState>((set, get) => ({
       compileStatus,
     }
   })),
+  requestCursorAt: (offset: number | null) => set({ pendingCursorOffset: offset }),
 
   // Tab management
   addOpenFile: (path: string) => set((state) => {
