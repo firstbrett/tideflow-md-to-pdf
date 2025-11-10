@@ -33,6 +33,8 @@ interface EditorStoreState {
   activeAnchorId: string | null;
   setActiveAnchorId: (id: string | null) => void;
   pendingCursorOffset: number | null;
+  previewFallbackRatio: number | null;
+  setPreviewFallbackRatio: (ratio: number | null) => void;
   syncMode: SyncMode;
   setSyncMode: (mode: SyncMode) => void;
   syncEnabled: boolean;
@@ -57,6 +59,7 @@ export const useEditorStore = create<EditorStoreState>((set, get) => ({
   // Editor state
   editor: initialEditorState,
   pendingCursorOffset: null,
+  previewFallbackRatio: null,
 
   sourceMap: null,
   setSourceMap: (map: SourceMap | null) => set({ sourceMap: map }),
@@ -108,6 +111,7 @@ export const useEditorStore = create<EditorStoreState>((set, get) => ({
     }
   })),
   requestCursorAt: (offset: number | null) => set({ pendingCursorOffset: offset }),
+  setPreviewFallbackRatio: (ratio: number | null) => set({ previewFallbackRatio: ratio }),
 
   // Tab management
   addOpenFile: (path: string) => set((state) => {

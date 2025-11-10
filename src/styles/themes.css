@@ -181,6 +181,13 @@
   --cm-code-color: #ffb86c;
   --cm-quote-color: #9fb1c7;
   --cm-punctuation-color: #a5a7ff;
+  --cm-keyword-color: #ff8dce;
+  --cm-number-color: #ffd479;
+  --cm-string-color: #9fe3b4;
+  --cm-variable-color: #8be9fd;
+  --cm-comment-color: #7c92aa;
+  --cm-tag-color: #ff6b6b;
+  --cm-atom-color: #f9f871;
 
   /* Search Panel Colors */
   --search-panel-bg: rgba(18, 27, 36, 0.96);
@@ -354,6 +361,13 @@
   --cm-code-color: #c2410c;        /* Orange-red - code blocks pop */
   --cm-quote-color: #64748b;       /* Slate gray - subtle but readable */
   --cm-punctuation-color: #6366f1; /* Indigo - visible markdown syntax */
+  --cm-keyword-color: #a21caf;     /* Rich magenta */
+  --cm-number-color: #b45309;      /* Amber brown */
+  --cm-string-color: #047857;      /* Emerald */
+  --cm-variable-color: #0f766e;    /* Teal */
+  --cm-comment-color: #475569;     /* Muted slate */
+  --cm-tag-color: #b91c1c;         /* Deep red */
+  --cm-atom-color: #b45309;
 
   /* Search Panel Colors */
   --search-panel-bg: #ffffff;

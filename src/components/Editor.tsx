@@ -51,6 +51,7 @@ const Editor: React.FC = () => {
     addOpenFile,
     pendingCursorOffset,
     requestCursorAt,
+    setPreviewFallbackRatio,
   } = useEditorStore();
   const preferences = usePreferencesStore((state) => state.preferences);
   const documentKind = detectDocumentKind(currentFile);
@@ -71,13 +72,15 @@ const Editor: React.FC = () => {
   });
 
   // Use editor sync hook - scroll synchronization
-  const { computeAnchorFromViewport, setupScrollListener } = useEditorSync({
+  const { computeAnchorFromViewport, setupScrollListener, handleSelectionChange } = useEditorSync({
     editorStateRefs,
     currentFile,
     sourceMap,
+    documentKind,
     setSyncMode,
     setActiveAnchorId,
     setEditorScrollPosition,
+    setPreviewFallbackRatio,
   });
 
   // Use content management hook - auto-render
@@ -129,6 +132,7 @@ const Editor: React.FC = () => {
     renderDebounceMs: preferences.render_debounce_ms,
     setupScrollListener,
     setEditorReady,
+    onSelectionChange: handleSelectionChange,
   });
 
   // Use anchor management hook - anchor sync effects

@@ -610,6 +610,42 @@
   color: var(--cm-punctuation-color) !important;
 }
 
+/* Generic token styles for Markdown, LaTeX, and code fences */
+.cm-keyword,
+.cm-builtin {
+  color: var(--cm-keyword-color) !important;
+  font-weight: 600;
+}
+
+.cm-variable,
+.cm-variableName {
+  color: var(--cm-variable-color) !important;
+}
+
+.cm-number {
+  color: var(--cm-number-color) !important;
+}
+
+.cm-atom {
+  color: var(--cm-atom-color) !important;
+}
+
+.cm-string,
+.cm-string-2 {
+  color: var(--cm-string-color) !important;
+}
+
+.cm-comment {
+  color: var(--cm-comment-color) !important;
+  font-style: italic !important;
+}
+
+.cm-tag,
+.cm-attributeName,
+.cm-qualifier {
+  color: var(--cm-tag-color) !important;
+}
+
 .cm-cursor {
   border-left: 2px solid var(--cm-cursor) !important;
 }

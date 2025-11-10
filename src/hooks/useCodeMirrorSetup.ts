@@ -141,6 +141,7 @@ interface UseCodeMirrorSetupParams {
   renderDebounceMs: number;
   setupScrollListener: () => (() => void) | undefined;
   setEditorReady: (ready: boolean) => void;
+  onSelectionChange?: (offset: number) => void;
 }
 
 export function useCodeMirrorSetup(params: UseCodeMirrorSetupParams) {
@@ -157,6 +158,7 @@ export function useCodeMirrorSetup(params: UseCodeMirrorSetupParams) {
     renderDebounceMs,
     setupScrollListener,
     setEditorReady,
+    onSelectionChange,
   } = params;
 
   const {
@@ -565,6 +567,16 @@ export function useCodeMirrorSetup(params: UseCodeMirrorSetupParams) {
               handleAutoRender(newContent, abortController.signal);
               isUserTypingRef.current = false;
             }, renderDebounceRef.current);
+
+            if (onSelectionChange) {
+              const head = update.state.selection.main.head;
+              onSelectionChange(head);
+            }
+          }
+
+          if (update.selectionSet && onSelectionChange && !update.docChanged) {
+            const head = update.state.selection.main.head;
+            onSelectionChange(head);
           }
         }), // Close the updateListener.of() call
       ],
@@ -588,6 +600,10 @@ export function useCodeMirrorSetup(params: UseCodeMirrorSetupParams) {
         },
         annotations: programmaticUpdateAnnotation.of(true)
       });
+    }
+
+    if (onSelectionChange) {
+      onSelectionChange(view.state.selection.main.head);
     }
 
     // Signal that editor is ready

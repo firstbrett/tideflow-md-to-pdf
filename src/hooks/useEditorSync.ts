@@ -4,10 +4,11 @@
  */
 
 import { useCallback, useEffect } from 'react';
-import type { SourceAnchor, SourceMap, SyncMode } from '../types';
+import type { DocumentKind, SourceAnchor, SourceMap, SyncMode } from '../types';
 import { TIMING, ANCHOR } from '../constants/timing';
 import type { EditorStateRefs } from './useEditorState';
 import { logger } from '../utils/logger';
+import { findDocumentBodyRange } from '../utils/document';
 
 const useEditorSyncLogger = logger.createScoped('useEditorSync');
 
@@ -15,9 +16,11 @@ interface UseEditorSyncParams {
   editorStateRefs: EditorStateRefs;
   currentFile: string | null;
   sourceMap: SourceMap | null;
+  documentKind: DocumentKind;
   setSyncMode: (mode: SyncMode) => void;
   setActiveAnchorId: (id: string | null) => void;
   setEditorScrollPosition: (file: string, position: number) => void;
+  setPreviewFallbackRatio: (ratio: number | null) => void;
 }
 
 export function useEditorSync(params: UseEditorSyncParams) {
@@ -25,9 +28,11 @@ export function useEditorSync(params: UseEditorSyncParams) {
     editorStateRefs,
     currentFile,
     sourceMap,
+    documentKind,
     setSyncMode,
     setActiveAnchorId,
     setEditorScrollPosition,
+    setPreviewFallbackRatio,
   } = params;
 
   const {
@@ -158,14 +163,63 @@ export function useEditorSync(params: UseEditorSyncParams) {
     anchorUpdateFromEditorRef,
   ]);
 
+  const handleSelectionChange = useCallback((offset: number) => {
+    const view = editorViewRef.current;
+    if (!view) return;
+    const map = sourceMapRef.current;
+
+    if (map && map.anchors.length > 0) {
+      let closest = map.anchors[0];
+      let bestDist = Math.abs(closest.editor.offset - offset);
+      for (const anchor of map.anchors) {
+        const dist = Math.abs(anchor.editor.offset - offset);
+        if (dist < bestDist) {
+          closest = anchor;
+          bestDist = dist;
+        }
+      }
+      if (closest && closest.id !== activeAnchorIdRef.current) {
+        anchorUpdateFromEditorRef.current = true;
+        setActiveAnchorId(closest.id);
+      }
+      setPreviewFallbackRatio(null);
+      return;
+    }
+
+    const doc = view.state.doc;
+    const fullText = doc.toString();
+    let bodyStart = 0;
+    let bodyEnd = fullText.length;
+    if (documentKind === 'latex') {
+      const bodyRange = findDocumentBodyRange(fullText);
+      bodyStart = bodyRange.start;
+      bodyEnd = bodyRange.end;
+    }
+    const clamped = Math.max(bodyStart, Math.min(bodyEnd, offset));
+    const denominator = Math.max(1, bodyEnd - bodyStart);
+    const ratio = (clamped - bodyStart) / denominator;
+    setPreviewFallbackRatio(ratio);
+  }, [
+    editorViewRef,
+    sourceMapRef,
+    activeAnchorIdRef,
+    anchorUpdateFromEditorRef,
+    setActiveAnchorId,
+    documentKind,
+    setPreviewFallbackRatio,
+  ]);
+
   // Sync sourceMapRef and trigger initial anchor compute when sourceMap is set
   useEffect(() => {
     sourceMapRef.current = sourceMap;
+    if (sourceMap && sourceMap.anchors.length > 0) {
+      setPreviewFallbackRatio(null);
+    }
     if (sourceMap && !initialSourceMapSet.current) {
       initialSourceMapSet.current = true;
       computeAnchorFromViewport(false);
     }
-  }, [sourceMap, computeAnchorFromViewport, sourceMapRef, initialSourceMapSet]);
+  }, [sourceMap, computeAnchorFromViewport, sourceMapRef, initialSourceMapSet, setPreviewFallbackRatio]);
 
   // Setup scroll listener with debounce
   const setupScrollListener = useCallback(() => {
@@ -198,6 +252,6 @@ export function useEditorSync(params: UseEditorSyncParams) {
   return {
     computeAnchorFromViewport,
     setupScrollListener,
+    handleSelectionChange,
   };
 }
-

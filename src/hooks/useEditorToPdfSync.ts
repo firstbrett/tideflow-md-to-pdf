@@ -62,6 +62,8 @@ export function useEditorToPdfSync(params: UseEditorToPdfSyncParams): void {
   const lastScrolledToAnchorRef = useRef<string | null>(null); // Track what we actually scrolled to
   const wasTypingRef = useRef(isTyping);
   const lastTypingStoppedAtRef = useRef<number>(0); // Track when typing stopped
+  const previewFallbackRatio = useEditorStore((state) => state.previewFallbackRatio);
+  const lastFallbackRatioRef = useRef<number | null>(null);
 
   // Effect 1: Sync PDF to active anchor when it changes (normal operation)
   useEffect(() => {
@@ -235,6 +237,34 @@ export function useEditorToPdfSync(params: UseEditorToPdfSyncParams): void {
     recomputeAnchorOffsets,
     lastScrolledToAnchorRef,
   ]);
+
+  useEffect(() => {
+    if (previewFallbackRatio == null) {
+      lastFallbackRatioRef.current = null;
+      return;
+    }
+    if (anchorOffsetsRef.current.size > 0) {
+      lastFallbackRatioRef.current = null;
+      return;
+    }
+    const el = containerRef.current;
+    if (!el || !el.isConnected) return;
+    if (
+      lastFallbackRatioRef.current !== null &&
+      Math.abs(lastFallbackRatioRef.current - previewFallbackRatio) < 0.001
+    ) {
+      return;
+    }
+    lastFallbackRatioRef.current = previewFallbackRatio;
+    const available = Math.max(0, el.scrollHeight - el.clientHeight);
+    const targetCenter = previewFallbackRatio * el.scrollHeight;
+    const targetTop = Math.min(Math.max(targetCenter - el.clientHeight / 2, 0), available);
+    programmaticScrollRef.current = true;
+    el.scrollTo({ top: targetTop, behavior: 'smooth' });
+    window.setTimeout(() => {
+      programmaticScrollRef.current = false;
+    }, 150);
+  }, [previewFallbackRatio, anchorOffsetsRef, containerRef, programmaticScrollRef]);
 
   // Effect 3: Initial startup sync (when app first loads)
   useEffect(() => {
