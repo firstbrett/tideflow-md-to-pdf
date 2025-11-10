@@ -650,7 +650,23 @@
 .cm-tag,
 .cm-attributeName,
 .cm-qualifier {
-  color: var(--cm-tag-color) !important;
+  color: var(--cm-latex-command-color, var(--cm-tag-color)) !important;
+}
+
+/* LaTeX-focused token tweaks */
+.cm-variableName,
+.cm-variableName-special {
+  color: var(--cm-latex-argument-color, var(--cm-variable-color)) !important;
+  font-weight: 600;
+}
+
+.cm-operator {
+  color: var(--cm-latex-operator-color, var(--cm-punctuation-color)) !important;
+}
+
+.cm-atom {
+  color: var(--cm-latex-atom-color, var(--cm-atom-color)) !important;
+  font-weight: 500;
 }
 
 .cm-cursor {

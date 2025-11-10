@@ -182,7 +182,7 @@
   --cm-quote-color: #9fb1c7;
   --cm-punctuation-color: #ff7043;
   --cm-square-bracket-color: #ff9500;
-  --cm-curly-bracket-color: #ff4d4d;
+  --cm-curly-bracket-color: #4da6ff;
   --cm-keyword-color: #ff8dce;
   --cm-number-color: #ffd479;
   --cm-string-color: #9fe3b4;
@@ -190,6 +190,11 @@
   --cm-comment-color: #7c92aa;
   --cm-tag-color: #ff6b6b;
   --cm-atom-color: #f9f871;
+  --cm-latex-command-color: #a5b8ff;
+  --cm-latex-argument-color: #7cd7d2;
+  --cm-latex-math-color: #ffd37a;
+  --cm-latex-operator-color: #f472b6;
+  --cm-latex-atom-color: #f5e06f;
 
   /* Search Panel Colors */
   --search-panel-bg: rgba(18, 27, 36, 0.96);
@@ -364,7 +369,7 @@
   --cm-quote-color: #64748b;       /* Slate gray - subtle but readable */
   --cm-punctuation-color: #dd6b20;
   --cm-square-bracket-color: #ea580c;
-  --cm-curly-bracket-color: #e11d48;
+  --cm-curly-bracket-color: #2563eb;
   --cm-keyword-color: #a21caf;     /* Rich magenta */
   --cm-number-color: #b45309;      /* Amber brown */
   --cm-string-color: #047857;      /* Emerald */
@@ -372,6 +377,11 @@
   --cm-comment-color: #475569;     /* Muted slate */
   --cm-tag-color: #b91c1c;         /* Deep red */
   --cm-atom-color: #b45309;
+  --cm-latex-command-color: #1d4ed8;
+  --cm-latex-argument-color: #0f766e;
+  --cm-latex-math-color: #d97706;
+  --cm-latex-operator-color: #be185d;
+  --cm-latex-atom-color: #92400e;
 
   /* Search Panel Colors */
   --search-panel-bg: #ffffff;

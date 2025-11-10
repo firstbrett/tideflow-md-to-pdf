@@ -23,6 +23,22 @@
   - `npm run lint` runs the ESLint suite.
   - `npm run test` is currently a placeholder (no Jest/Vitest tests ship with the repo).
 
+## Recent notable enhancements
+- **LaTeX/TikZ pipeline**
+  - Added `src-tauri/src/tikz.rs` and supporting `tex.rs` helper so fenced ```tikz blocks and standalone `.tex` files compile through Tectonic → Pdfium. TikZ assets are cached under `.build/tikz-cache` and rasterized to PNG for Typst. Plain `.tex` tabs use the same preview pane as Markdown.
+  - Typst template (`tideflow.typ`) exposes `tikz_render` and pulls in the bundled TikZ + mitex packages so Markdown math and injected diagrams render without extra setup.
+  - Preprocessor now records TikZ fences (`TikzBlockMeta`), emits raw Typst placeholders, and hashes blocks for cache invalidation.
+
+- **PDF↔Editor sync upgrades**
+  - Scroll sync works both ways for Markdown and LaTeX. Double‑clicking inside the PDF moves the editor caret (anchors for Markdown, proportional body mapping for `.tex`). Moving the caret in the editor centers the matching paragraph/diagram in the preview even when no anchors exist (fall back to relative document position).
+  - `useEditorToPdfSync`/`usePdfToEditorSync` share the new fallback ratio plus per‑anchor offsets so switching documents or resizing windows keeps both panes aligned.
+
+- **TikZ diagnostics**
+  - On compile failure, the fallback raster shows the Tectonic error. We emit synctex debug copies to `src-tauri/src-tauri/gen_debug/tikz` and log PDFium/Tectonic stderr for troubleshooting.
+
+- **Editor UX**
+  - CodeMirror theme styling expanded with token‑level colors so Markdown + TeX syntax (commands, braces, arguments, strings, comments) mirror VS Code. Dark theme palette was retuned to VS Code’s `#1e1e1e` family and bracket colors split (square = orange, curly = red) for quick visual parsing.
+
 ## TikZ rendering integration strategy
 1. **Expose a Markdown affordance.**
    - Treat fenced code blocks tagged `tikz` (```` ```tikz ... ``` ````) as TikZ drawings. Detect them inside the Rust preprocessor *before* anchor injection so offsets stay consistent. Recommended approach: add a new transformation in `preprocessor.rs` that scans the Markdown AST via `pulldown_cmark` and replaces each TikZ fence with an HTML comment placeholder such as `<!--raw-typst #tikz_diagram("anchor-id")[#tikz.render(block: "...")] -->`. Because `preprocess_markdown` output is only used for rendering, the user-facing Markdown file remains unchanged.
