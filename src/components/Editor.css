@@ -604,10 +604,17 @@
 
 /* Punctuation, meta characters, brackets */
 .cm-punctuation,
-.cm-meta,
-.cm-bracket,
-.cm-brace {
+.cm-meta {
   color: var(--cm-punctuation-color) !important;
+}
+
+.cm-bracket,
+.cm-squareBracket {
+  color: var(--cm-square-bracket-color, var(--cm-punctuation-color)) !important;
+}
+
+.cm-brace {
+  color: var(--cm-curly-bracket-color, var(--cm-punctuation-color)) !important;
 }
 
 /* Generic token styles for Markdown, LaTeX, and code fences */
