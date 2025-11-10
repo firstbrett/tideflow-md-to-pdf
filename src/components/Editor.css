@@ -608,13 +608,12 @@
   color: var(--cm-punctuation-color) !important;
 }
 
-.cm-bracket,
-.cm-squareBracket {
-  color: var(--cm-square-bracket-color, var(--cm-punctuation-color)) !important;
+.cm-bracket:not(.cm-squareBracket) {
+  color: var(--cm-curly-bracket-color, var(--cm-punctuation-color)) !important;
 }
 
-.cm-brace {
-  color: var(--cm-curly-bracket-color, var(--cm-punctuation-color)) !important;
+.cm-squareBracket {
+  color: var(--cm-square-bracket-color, var(--cm-punctuation-color)) !important;
 }
 
 /* Generic token styles for Markdown, LaTeX, and code fences */
@@ -631,10 +630,6 @@
 
 .cm-number {
   color: var(--cm-number-color) !important;
-}
-
-.cm-atom {
-  color: var(--cm-atom-color) !important;
 }
 
 .cm-string,
