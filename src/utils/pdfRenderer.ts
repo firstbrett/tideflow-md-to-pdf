@@ -1,4 +1,5 @@
 import * as pdfjsLib from 'pdfjs-dist';
+import type { RenderParameters } from 'pdfjs-dist/types/src/display/api';
 import { logger } from './logger';
 
 // Create scoped logger
@@ -56,7 +57,7 @@ export async function renderPdfPages(
       canvas.style.width = `${viewport.width}px`;
       canvas.style.height = `${viewport.height}px`;
       tmpWrap.appendChild(canvas);
-      const renderContext: pdfjsLib.PDFRenderParams = {
+      const renderContext: RenderParameters = {
         canvasContext: ctx,
         viewport,
         transform: outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : undefined,
